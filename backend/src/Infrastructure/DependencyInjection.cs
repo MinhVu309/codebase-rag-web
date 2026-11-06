@@ -1,4 +1,6 @@
 using Application.Abstractions;
+using Application.Rag;
+using Infrastructure.Rag;
 using Infrastructure.Auth;
 using Infrastructure.Options;
 using Infrastructure.Persistence;
@@ -41,6 +43,8 @@ public static class DependencyInjection
                 "JWT_ACCESS_TOKEN_MINUTES and JWT_REFRESH_TOKEN_DAYS must be positive.")
             .ValidateOnStart();
 
+        AddRag(services);
+
         services.AddSingleton<IPasswordService, IdentityPasswordService>();
         services.AddSingleton<ITokenService, JwtTokenService>();
 
@@ -75,4 +79,45 @@ public static class DependencyInjection
 
         return services;
     }
+
+    private static void AddRag(IServiceCollection services)
+    {
+        services.AddOptions<RagOptions>()
+            .Configure<IConfiguration>((o, c) =>
+            {
+                if (Enum.TryParse<RagMode>(c["RAG_MODE"], ignoreCase: true, out var mode)) o.Mode = mode;
+                o.BaseUrl = c["RAG_BASE_URL"] ?? "";
+                o.ApiKey = c["RAG_API_KEY"] ?? "";
+                o.QueryTimeout = Seconds(c["RAG_QUERY_TIMEOUT_SECONDS"], o.QueryTimeout);
+                o.StatusTimeout = Seconds(c["RAG_STATUS_TIMEOUT_SECONDS"], o.StatusTimeout);
+                o.RequestTimeout = Seconds(c["RAG_REQUEST_TIMEOUT_SECONDS"], o.RequestTimeout);
+                if (int.TryParse(c["RAG_STATUS_RETRIES"], out var retries) && retries >= 0) o.StatusRetries = retries;
+            })
+            .Validate(o => o.Mode == RagMode.Fake
+                           || (Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var u) && u.Scheme is "http" or "https"),
+                "RAG_BASE_URL must be an absolute http(s) URL (or set RAG_MODE=fake).")
+            .Validate(o => o.Mode == RagMode.Fake || !string.IsNullOrWhiteSpace(o.ApiKey),
+                "RAG_API_KEY is required (or set RAG_MODE=fake).")
+            .ValidateOnStart();
+
+        services.AddHttpContextAccessor();
+        services.AddHttpClient<HttpRagClient>((sp, client) =>
+        {
+            var o = sp.GetRequiredService<IOptions<RagOptions>>().Value;
+            if (o.Mode == RagMode.Http)
+                client.BaseAddress = new Uri(o.BaseUrl.TrimEnd('/') + "/");
+            // Per-call timeouts are enforced in HttpRagClient (they differ per endpoint).
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.AddSingleton<FakeRagClient>();
+        services.AddScoped<IRagClient>(sp =>
+            sp.GetRequiredService<IOptions<RagOptions>>().Value.Mode == RagMode.Fake
+                ? sp.GetRequiredService<FakeRagClient>()
+                : sp.GetRequiredService<HttpRagClient>());
+    }
+
+    private static TimeSpan Seconds(string? value, TimeSpan fallback) =>
+        double.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var s) && s > 0
+            ? TimeSpan.FromSeconds(s)
+            : fallback;
 }

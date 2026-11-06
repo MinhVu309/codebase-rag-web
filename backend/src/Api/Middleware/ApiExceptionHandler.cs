@@ -1,4 +1,5 @@
 using Application.Common;
+using Application.Rag;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +26,10 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetails, ILogger<
                 break;
             case UnauthorizedException u:
                 problem = new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized", Detail = u.Message };
+                break;
+            case RagException r:
+                problem = RagProblemMapper.ToProblem(r);
+                logger.LogWarning("RAG call failed: {Kind} {Code} (upstream {Status})", r.Kind, r.Code, r.UpstreamStatus);
                 break;
             default:
                 // Log the exception type/stack only; exception messages here never carry credentials.

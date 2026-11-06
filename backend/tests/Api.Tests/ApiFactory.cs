@@ -31,6 +31,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["DATABASE_URL"] = _postgres.GetConnectionString(),
+            ["RAG_MODE"] = "fake",
             ["JWT_SECRET"] = JwtSecret,
             ["JWT_ISSUER"] = JwtIssuer,
             ["JWT_AUDIENCE"] = JwtAudience,
