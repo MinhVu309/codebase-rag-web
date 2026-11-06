@@ -21,6 +21,9 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetails, ILogger<
                     Title = "Validation failed",
                 };
                 break;
+            case NotFoundException n:
+                problem = new ProblemDetails { Status = StatusCodes.Status404NotFound, Title = "Not found", Detail = n.Message };
+                break;
             case ConflictException c:
                 problem = new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Conflict", Detail = c.Message };
                 break;
