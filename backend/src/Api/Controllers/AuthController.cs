@@ -54,9 +54,6 @@ public class AuthController(AuthService auth, AuthCookies cookies) : ControllerB
     [HttpGet("me")]
     public async Task<ActionResult<UserDto>> Me(CancellationToken ct)
     {
-        var sub = User.FindFirst("sub")?.Value;
-        if (!Guid.TryParse(sub, out var userId))
-            throw new UnauthorizedException("Invalid token.");
-        return await auth.GetCurrentUserAsync(userId, ct);
+        return await auth.GetCurrentUserAsync(User.GetUserId(), ct);
     }
 }

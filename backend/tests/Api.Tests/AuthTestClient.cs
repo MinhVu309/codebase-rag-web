@@ -11,7 +11,7 @@ public class AuthTestClient
     public Dictionary<string, string> Cookies { get; } = new();
     public IList<SetCookieHeaderValue> LastSetCookies { get; private set; } = [];
 
-    public AuthTestClient(ApiFactory factory)
+    public AuthTestClient(WebApplicationFactory<Program> factory)
     {
         _http = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -27,6 +27,20 @@ public class AuthTestClient
         {
             Content = body is null ? null : JsonContent.Create(body),
         });
+
+    public Task<HttpResponseMessage> PutAsync(string url, object body) =>
+        SendAsync(new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(body) });
+
+    public Task<HttpResponseMessage> DeleteAsync(string url) => SendAsync(new HttpRequestMessage(HttpMethod.Delete, url));
+
+    /// <summary>Registers a brand-new user on <paramref name="factory"/> and returns a client logged in as them.</summary>
+    public static async Task<AuthTestClient> NewUserAsync(WebApplicationFactory<Program> factory)
+    {
+        var client = new AuthTestClient(factory);
+        var response = await client.PostAsync("/api/auth/register", new { email = NewEmail(), password = "S3cret-Passw0rd!" });
+        response.EnsureSuccessStatusCode();
+        return client;
+    }
 
     public Task<HttpResponseMessage> GetAsync(string url) => SendAsync(new HttpRequestMessage(HttpMethod.Get, url));
 
