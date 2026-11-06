@@ -1,4 +1,5 @@
 using Application.Auth;
+using Application.Chat;
 using Application.Projects;
 using Application.Repositories;
 using FluentValidation;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<ProjectService>();
         services.AddScoped<RepositoryService>();
+        services.AddScoped<ChatService>();
         return services;
     }
 }

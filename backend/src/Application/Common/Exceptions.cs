@@ -9,7 +9,11 @@ public sealed class ValidationFailedException(IDictionary<string, string[]> erro
     public IDictionary<string, string[]> Errors { get; } = errors;
 }
 
-public sealed class ConflictException(string message) : AppException(message);
+/// <param name="code">Optional stable machine-readable code the frontend can branch on.</param>
+public sealed class ConflictException(string message, string? code = null) : AppException(message)
+{
+    public string? Code { get; } = code;
+}
 
 public sealed class UnauthorizedException(string message) : AppException(message);
 

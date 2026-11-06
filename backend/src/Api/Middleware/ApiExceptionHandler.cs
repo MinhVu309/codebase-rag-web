@@ -26,6 +26,7 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetails, ILogger<
                 break;
             case ConflictException c:
                 problem = new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Conflict", Detail = c.Message };
+                if (c.Code is not null) problem.Extensions["code"] = c.Code;
                 break;
             case UnauthorizedException u:
                 problem = new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized", Detail = u.Message };

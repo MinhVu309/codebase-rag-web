@@ -113,8 +113,11 @@ public class RepositoryService(
             .FirstOrDefaultAsync(r => r.Id == repositoryId && r.Project.UserId == userId, ct)
         ?? throw new NotFoundException("Repository not found.");
 
+    /// <summary>
+    /// Brings a tracked repository up to date with RAG while it is still being built (no-op once ready/failed).
+    /// </summary>
     /// <returns>true when the state could not be refreshed and the cached one is being returned.</returns>
-    private async Task<bool> RefreshAsync(CodeRepository repo, CancellationToken ct)
+    public async Task<bool> RefreshAsync(CodeRepository repo, CancellationToken ct)
     {
         if (RepositoryDto.IsTerminal(repo.Status)) return false;
 
