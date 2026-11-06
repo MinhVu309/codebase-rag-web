@@ -1,1 +1,1 @@
-namespace Application; public static class AssemblyMarker;
+namespace Application; public sealed class AssemblyMarker;
