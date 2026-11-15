@@ -92,7 +92,7 @@ Phần này là những gì frontend cần biết để nối với backend hi�
 - Chạy local qua http thì giữ `AUTH_COOKIE_SECURE=false` trong `.env` (đã là mặc định của `.env.example`). Khi deploy có TLS phải là `true`.
 - Khi một API trả 401 vì access token hết hạn: gọi `POST /api/auth/refresh`, nếu thành công thì thử lại request đó một lần. Nếu refresh cũng trả 401 thì chuyển về trang đăng nhập.
 
-### Các endpoint hiện có (đến Phase E)
+### Các endpoint hiện có
 
 Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, `logout`.
 
@@ -108,12 +108,13 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 | GET, PUT, DELETE | `/api/projects/{id}` | Chi tiết (kèm repository), đổi tên, xoá |
 | POST | `/api/projects/{id}/repositories` | Import repo GitHub (body: `repoUrl`, `ref` tuỳ chọn; bỏ `ref` thì index nhánh mặc định của repo). Trả 202 |
 | GET | `/api/repositories/{id}` | Trạng thái repository, dùng để poll |
+| GET | `/api/repositories/{id}/files` | Code viewer: đọc một đoạn file của bản đã index (`?path=&start=&end=`, xem "Code viewer" bên dưới) |
 | DELETE | `/api/repositories/{id}` | Xoá repository |
 | GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn) |
 | GET | `/api/conversations/{id}/messages` | Lịch sử tin nhắn (`?limit=`, mặc định 200, tối đa 500) |
 | POST | `/api/conversations/{id}/messages` | Hỏi một câu (body: `question` tối đa 2000 ký tự, `topK` từ 1 đến 20 tuỳ chọn) |
 
-Chưa có: endpoint đọc file cho code viewer (`/api/repositories/{id}/files`, dự kiến Phase F), xoá hoặc đổi tên hội thoại. Cần gì thêm thì báo để thống nhất trước khi backend làm.
+Chưa có: xoá hoặc đổi tên hội thoại. Cần gì thêm thì báo để thống nhất trước khi backend làm.
 
 `repoUrl` chỉ nhận đúng dạng `https://github.com/<owner>/<repo>`.
 
@@ -142,9 +143,30 @@ Mọi lỗi là ProblemDetails (JSON). Lỗi validate (400) có thêm `errors` t
 | `LLM_ERROR` | 502 | Hệ thống AI lỗi tạm thời, cho thử lại |
 | `RAG_UNAVAILABLE` | 502 | Không kết nối được hệ thống AI |
 | `TIMEOUT` | 504 | Hệ thống AI trả lời quá hạn, cho thử lại |
-| `FILE_NOT_FOUND` | 404 | File không còn (chuẩn bị cho code viewer): hiển thị snippet đã lưu kèm nhãn "phiên bản cũ" |
+| `FILE_NOT_FOUND` | 404 | File không còn trong bản đã index (code viewer): hiển thị snippet đã lưu trong citation kèm nhãn "phiên bản cũ" |
+| `INDEX_NOT_FOUND` | 404 | RAG không còn chỉ mục của repository (code viewer) |
+| `INVALID_RANGE` | 400 | Khoảng dòng sai: `start` < 1, `end` < `start`, hoặc quá 2000 dòng (code viewer) |
+| `REPOSITORY_FAILED` | 409 | (cũng dùng cho code viewer) repository đã index thất bại |
 
 Timeout từ frontend tới backend nên đặt 60 giây.
+
+### Code viewer
+
+`GET /api/repositories/{id}/files?path=<đường dẫn>&start=<dòng đầu>&end=<dòng cuối>` (cần đăng nhập).
+
+- `path` bắt buộc: đường dẫn tương đối so với gốc repo, đúng như `filePath` trong citation (ví dụ `src/flask/app.py`, **không** có `/` đầu). Tối đa 1024 ký tự, không chứa `..`, không bắt đầu bằng `/` hoặc `\`, không có ký tự điều khiển. Sai thì 400 kèm `errors.Path`.
+- `start` mặc định 1, `end` mặc định `start + 1999`. Tối đa **2000 dòng** mỗi lần (`end - start + 1 <= 2000`). Sai khoảng dòng thì 400 với `code: "INVALID_RANGE"`. Muốn xem file dài hơn thì gọi nhiều lần. Nếu `end` vượt cuối file, RAG cắt về dòng cuối và `end` trong response là giá trị đã cắt. `start` vượt cuối file là 400 `INVALID_RANGE`.
+- Chỉ chủ sở hữu đọc được. Repository của người khác và repository không tồn tại cho **cùng một** 404.
+- Repository chưa `ready` thì 409: `INDEX_NOT_READY` (đang index), `NO_REPOSITORY` (chưa có chỉ mục), `REPOSITORY_FAILED` (index thất bại). Backend không hỏi RAG trong các trường hợp này.
+- `404 FILE_NOT_FOUND`: file không còn trong bản đã index. Frontend hiển thị `snippet` đã lưu trong citation kèm nhãn "phiên bản cũ" (D14). `404 INDEX_NOT_FOUND`: RAG đã mất chỉ mục. `502 RAG_UNAVAILABLE` và `504 TIMEOUT` như các API khác.
+
+Response (camelCase):
+
+```json
+{ "path": "src/flask/app.py", "start": 34, "end": 36, "content": "def verify_token(...)\n...", "language": "python", "commitSha": "d086db856be1..." }
+```
+
+`language` có thể là `null` (RAG không nhận ra ngôn ngữ), `commitSha` là commit repository đã được index (có thể `null`). `content` là **nguyên văn** (kể cả `<script>` hay markdown): frontend phải escape khi render. Mốc dòng trong citation (`startLine`, `endLine`) dùng được trực tiếp làm `start`, `end`.
 
 ### Hiển thị câu trả lời
 
