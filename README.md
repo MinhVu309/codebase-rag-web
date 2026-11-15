@@ -110,7 +110,7 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 | GET | `/api/repositories/{id}` | Trạng thái repository, dùng để poll |
 | GET | `/api/repositories/{id}/files` | Code viewer: đọc một đoạn file của bản đã index (`?path=&start=&end=`, xem "Code viewer" bên dưới) |
 | DELETE | `/api/repositories/{id}` | Xoá repository |
-| GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn) |
+| GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn, cùng luật title với đổi tên, xem "Quản lý hội thoại") |
 | PATCH | `/api/conversations/{id}` | Đổi tên hội thoại (body: `title`, xem "Quản lý hội thoại" bên dưới). Trả 200 với `ConversationDto` |
 | DELETE | `/api/conversations/{id}` | Xoá hội thoại cùng toàn bộ tin nhắn và citation của nó. Trả 204 |
 | GET | `/api/conversations/{id}/messages` | Lịch sử tin nhắn (`?limit=`, mặc định 200, tối đa 500) |
@@ -172,9 +172,11 @@ Response (camelCase):
 
 ### Quản lý hội thoại
 
+**Luật title (dùng chung cho tạo và đổi tên):** backend cắt khoảng trắng hai đầu rồi mới kiểm tra. Title phải dài 1 đến **200** ký tự và không chứa ký tự điều khiển (xuống dòng, tab, ...); backend lưu và trả về bản đã cắt, nên frontend nên hiển thị giá trị trong response thay vì giá trị người dùng gõ. Khi **tạo** (`POST`), `title` vẫn tuỳ chọn: bỏ trống hoặc `null` thì dùng tên mặc định "New conversation" (sau câu hỏi đầu tiên tự đổi thành tên theo câu hỏi); khi **đổi tên** (`PATCH`) thì bắt buộc. Title sai thì 400 với `errors.Title`.
+
 **Đổi tên:** `PATCH /api/conversations/{id}` với body `{ "title": "..." }`.
 
-- `title` bắt buộc. Backend cắt khoảng trắng hai đầu rồi mới kiểm tra: phải dài 1 đến **200** ký tự và không chứa ký tự điều khiển (xuống dòng, tab, ...). Backend lưu và trả về bản đã cắt, nên frontend nên hiển thị giá trị trong response thay vì giá trị người dùng gõ.
+- `title` bắt buộc, theo luật title ở trên.
 - Thành công: **200** với `{ id, projectId, title, createdAt }` (cùng dạng với response của `POST /api/projects/{id}/conversations`; không có `lastActivityAt` và `messageCount`, hãy giữ các giá trị đó từ danh sách đã tải).
 - Title sai: **400** ProblemDetails, `errors.Title` là danh sách thông báo (cùng định dạng các lỗi validate khác).
 
