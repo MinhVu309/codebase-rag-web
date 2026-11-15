@@ -120,6 +120,70 @@ public class ChatEndpointTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("a\nb")]
+    [InlineData("a\r\nb")]
+    [InlineData("a\tb")]
+    [InlineData("a\0b")]
+    public async Task Create_Conversation_Rejects_Control_Characters_In_The_Title(string title)
+    {
+        var rag = new RecordingRagClient();
+        using var app = WithRag(rag);
+        var s = await SetupAsync(app, rag);
+
+        var response = await s.Client.PostAsync($"/api/projects/{s.ProjectId}/conversations", new { title });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.True(problem.GetProperty("errors").TryGetProperty("Title", out _));
+    }
+
+    [Fact]
+    public async Task Create_Conversation_Stores_The_Trimmed_Title()
+    {
+        var rag = new RecordingRagClient();
+        using var app = WithRag(rag);
+        var s = await SetupAsync(app, rag);
+
+        var created = await CreateConversationAsync(s.Client, s.ProjectId, "  \t abc  \n");
+
+        Assert.Equal("abc", created.Title);
+        var list = await (await s.Client.GetAsync($"/api/projects/{s.ProjectId}/conversations"))
+            .Content.ReadFromJsonAsync<List<ConversationSummaryDto>>();
+        Assert.Contains(list!, c => c.Id == created.Id && c.Title == "abc");
+    }
+
+    [Fact]
+    public async Task Create_Conversation_Without_A_Title_Still_Gets_The_Default_Title()
+    {
+        var rag = new RecordingRagClient();
+        using var app = WithRag(rag);
+        var s = await SetupAsync(app, rag);
+
+        var omitted = await s.Client.PostAsync($"/api/projects/{s.ProjectId}/conversations", new { });
+        var explicitNull = await CreateConversationAsync(s.Client, s.ProjectId, title: null);
+
+        Assert.Equal(HttpStatusCode.Created, omitted.StatusCode);
+        Assert.Equal(ChatRules.DefaultTitle, (await omitted.Content.ReadFromJsonAsync<ConversationDto>())!.Title);
+        Assert.Equal(ChatRules.DefaultTitle, explicitNull.Title);
+    }
+
+    [Fact]
+    public async Task Create_Conversation_Accepts_Exactly_The_Maximum_Title_Length()
+    {
+        var rag = new RecordingRagClient();
+        using var app = WithRag(rag);
+        var s = await SetupAsync(app, rag);
+        var title = new string('t', ChatRules.MaxTitleLength);
+
+        var plain = await s.Client.PostAsync($"/api/projects/{s.ProjectId}/conversations", new { title });
+        var padded = await s.Client.PostAsync($"/api/projects/{s.ProjectId}/conversations", new { title = $"  {title}  " });
+
+        Assert.Equal(HttpStatusCode.Created, plain.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, padded.StatusCode);
+        Assert.Equal(title, (await padded.Content.ReadFromJsonAsync<ConversationDto>())!.Title);
+    }
+
     // ---------- asking ----------
 
     [Fact]

@@ -20,6 +20,7 @@ public partial class ChatService(
     IRagClient rag,
     RepositoryService repositories,
     IValidator<CreateConversationRequest> createValidator,
+    IValidator<UpdateConversationRequest> renameValidator,
     IValidator<AskRequest> askValidator,
     TimeProvider clock,
     ILogger<ChatService> logger)
@@ -79,6 +80,33 @@ public partial class ChatService(
 
         latest.Reverse();
         return latest.Select(MessageDto.From).ToList();
+    }
+
+    /// <summary>
+    /// Renames a conversation. Order: ownership (404, same as "does not exist") -> validation (400) -> save. The
+    /// title is user content: it is stored but never logged.
+    /// </summary>
+    public async Task<ConversationDto> RenameConversationAsync(Guid userId, Guid conversationId, UpdateConversationRequest? request, CancellationToken ct)
+    {
+        var conversation = await FindOwnedConversationAsync(userId, conversationId, ct);
+
+        request ??= new UpdateConversationRequest(null);
+        await renameValidator.EnsureValidAsync(request, ct);
+
+        conversation.Title = request.Title!.Trim();
+        await db.SaveChangesAsync(ct);
+        return new ConversationDto(conversation.Id, conversation.ProjectId, conversation.Title, conversation.CreatedAt);
+    }
+
+    /// <summary>
+    /// Hard-deletes the conversation; its messages (and their citation snapshots) go with it through the database
+    /// cascade. RAG is not involved: it keeps no history.
+    /// </summary>
+    public async Task DeleteConversationAsync(Guid userId, Guid conversationId, CancellationToken ct)
+    {
+        var conversation = await FindOwnedConversationAsync(userId, conversationId, ct);
+        db.Conversations.Remove(conversation);
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<AskResultDto> AskAsync(Guid userId, Guid conversationId, AskRequest request, CancellationToken ct)

@@ -31,6 +31,9 @@ public class AuthTestClient
     public Task<HttpResponseMessage> PutAsync(string url, object body) =>
         SendAsync(new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(body) });
 
+    public Task<HttpResponseMessage> PatchAsync(string url, object? body = null) =>
+        SendAsync(new HttpRequestMessage(HttpMethod.Patch, url) { Content = body is null ? null : JsonContent.Create(body) });
+
     public Task<HttpResponseMessage> DeleteAsync(string url) => SendAsync(new HttpRequestMessage(HttpMethod.Delete, url));
 
     /// <summary>Registers a brand-new user on <paramref name="factory"/> and returns a client logged in as them.</summary>

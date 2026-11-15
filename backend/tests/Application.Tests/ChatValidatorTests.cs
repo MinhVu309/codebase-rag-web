@@ -33,6 +33,30 @@ public class ChatValidatorTests
     [InlineData("A title", true)]
     [InlineData("", false)]
     [InlineData("   ", false)]
+    [InlineData("a\nb", false)]
+    [InlineData("a\tb", false)]
+    [InlineData("  abc  ", true)]
+    [InlineData("abc\n", true)] // trimmed before the control-character check, like rename
     public void Create_Conversation_Title_Validation(string? title, bool valid) =>
         Assert.Equal(valid, _create.Validate(new CreateConversationRequest(title)).IsValid);
+
+    [Fact]
+    public void Create_Title_Length_Is_Judged_After_Trimming()
+    {
+        Assert.True(_create.Validate(new CreateConversationRequest(new string('x', ChatRules.MaxTitleLength))).IsValid);
+        Assert.True(_create.Validate(new CreateConversationRequest("  " + new string('x', ChatRules.MaxTitleLength) + "  ")).IsValid);
+        Assert.False(_create.Validate(new CreateConversationRequest(new string('x', ChatRules.MaxTitleLength + 1))).IsValid);
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("  abc  ")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("a\nb")]
+    [InlineData("a\u0085b")]
+    [InlineData("abc\n")]
+    public void Create_And_Rename_Agree_On_Every_Non_Null_Title(string title) =>
+        Assert.Equal(_create.Validate(new CreateConversationRequest(title)).IsValid,
+            new UpdateConversationRequestValidator().Validate(new UpdateConversationRequest(title)).IsValid);
 }
