@@ -241,6 +241,10 @@ public class FileEndpointTests(ApiFactory factory)
     [InlineData("?path=src/../../etc/passwd")]
     [InlineData("?path=src/%2e%2e/x")]       // encoded ".."
     [InlineData("?path=..")]
+    [InlineData("?path=a/../b")]
+    [InlineData("?path=a/..")]
+    [InlineData("?path=a%5C..%5Cb")]         // backslash separators
+    [InlineData("?path=..%5Cx")]
     [InlineData("?path=/etc/passwd")]        // absolute
     [InlineData("?path=%5Cwindows%5Csystem32")] // leading backslash
     [InlineData("?path=src/a%00.cs")]        // NUL
@@ -258,6 +262,24 @@ public class FileEndpointTests(ApiFactory factory)
         var problem = await ProblemOf(response);
         Assert.Contains("Path", problem.Errors!.Keys);
         Assert.Empty(rag.FileCalls);
+    }
+
+    [Theory]
+    [InlineData("docs/v1..2.md")]
+    [InlineData("..hidden")]
+    [InlineData("a/b..c/d.txt")]
+    [InlineData("a/...")]
+    [InlineData("a/..b/c..")]
+    public async Task Names_That_Merely_Contain_Two_Dots_Reach_RAG(string path)
+    {
+        var rag = new RecordingRagClient();
+        using var app = WithRag(rag);
+        var s = await SeedAsync(app);
+
+        var response = await GetFileAsync(s, "?path=" + Uri.EscapeDataString(path));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(path, Assert.Single(rag.FileCalls).Path);
     }
 
     [Fact]

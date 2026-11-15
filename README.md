@@ -154,7 +154,7 @@ Timeout từ frontend tới backend nên đặt 60 giây.
 
 `GET /api/repositories/{id}/files?path=<đường dẫn>&start=<dòng đầu>&end=<dòng cuối>` (cần đăng nhập).
 
-- `path` bắt buộc: đường dẫn tương đối so với gốc repo, đúng như `filePath` trong citation (ví dụ `src/flask/app.py`, **không** có `/` đầu). Tối đa 1024 ký tự, không chứa `..`, không bắt đầu bằng `/` hoặc `\`, không có ký tự điều khiển. Sai thì 400 kèm `errors.Path`.
+- `path` bắt buộc: đường dẫn tương đối so với gốc repo, đúng như `filePath` trong citation (ví dụ `src/flask/app.py`, **không** có `/` đầu). Tối đa 1024 ký tự, không có đoạn nào đúng bằng `..` (tách theo `/` và `\`; tên như `v1..2.md` hay `..hidden` vẫn hợp lệ), không bắt đầu bằng `/` hoặc `\`, không có ký tự điều khiển. Sai thì 400 kèm `errors.Path`.
 - `start` mặc định 1, `end` mặc định `start + 1999`. Tối đa **2000 dòng** mỗi lần (`end - start + 1 <= 2000`). Sai khoảng dòng thì 400 với `code: "INVALID_RANGE"`. Muốn xem file dài hơn thì gọi nhiều lần. Nếu `end` vượt cuối file, RAG cắt về dòng cuối và `end` trong response là giá trị đã cắt. `start` vượt cuối file là 400 `INVALID_RANGE`.
 - Chỉ chủ sở hữu đọc được. Repository của người khác và repository không tồn tại cho **cùng một** 404.
 - Repository chưa `ready` thì 409: `INDEX_NOT_READY` (đang index), `NO_REPOSITORY` (chưa có chỉ mục), `REPOSITORY_FAILED` (index thất bại). Backend không hỏi RAG trong các trường hợp này.

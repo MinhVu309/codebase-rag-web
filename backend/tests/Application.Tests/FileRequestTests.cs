@@ -36,6 +36,11 @@ public class FileRequestTests
     [InlineData("README.md")]
     [InlineData("a b/c d.txt")]
     [InlineData("src/ünï/файл.cs")]
+    [InlineData("docs/v1..2.md")]
+    [InlineData("..hidden")]
+    [InlineData("a/b..c/d.txt")]
+    [InlineData("a/...")]
+    [InlineData("a/..b/c..")]
     public void Good_Paths_Pass(string path) =>
         Assert.True(Validator.Validate(new ReadFileRequest(path, null, null)).IsValid);
 
@@ -46,6 +51,9 @@ public class FileRequestTests
     [InlineData("..")]
     [InlineData("a/../b")]
     [InlineData("a/..")]
+    [InlineData("../secret.txt")]
+    [InlineData("..\\x")]
+    [InlineData("a\\..\\b")]
     [InlineData("/abs")]
     [InlineData("\\abs")]
     [InlineData("a\0b")]
