@@ -20,8 +20,8 @@ Frontend chỉ nói chuyện với Web Backend qua `/api`. Frontend **không** g
 backend/            Web API (Api, Application, Domain, Infrastructure) và test
 frontend/           Giao diện React (chưa có, dành cho thành viên FE)
 docs/               Báo cáo tiến độ, xem docs/README.md
-contracts/          openapi.yaml của RAG sẽ được pin ở đây (chưa có)
-docker-compose.yml  api + postgres
+contracts/          openapi.yaml của RAG (bản pin, không sửa) và README ghi nguồn/commit/sha256
+docker-compose.yml  api + postgres (+ mock-rag, profile "mock")
 .env.example        mẫu biến môi trường (sao chép thành .env)
 .github/workflows/  CI: dotnet build + dotnet test
 ```
@@ -34,7 +34,44 @@ Cần Docker đang bật.
 2. `docker compose up -d --build`
 3. API chạy ở `http://localhost:8080`. Kiểm tra: `curl localhost:8080/health`.
 
-Mặc định `.env.example` đặt `RAG_MODE=fake`: backend dùng một RAG giả trong bộ nhớ nên **không cần RAG thật** để phát triển. Muốn nối RAG thật hoặc Prism, đặt `RAG_MODE=http`, `RAG_BASE_URL` và `RAG_API_KEY`. Trong compose, dùng `host.docker.internal` thay cho `localhost` khi RAG chạy trên máy host.
+Mặc định `.env.example` đặt `RAG_MODE=fake`: backend dùng một RAG giả trong bộ nhớ nên **không cần RAG thật** để phát triển. Muốn nối Prism hoặc RAG thật, xem mục "Mock RAG" bên dưới.
+
+### Mock RAG (Prism)
+
+`contracts/openapi.yaml` là bản pin của contract Web <-> RAG (nguồn, commit và sha256 ghi ở [contracts/README.md](contracts/README.md)). Service `mock-rag` trong compose chạy [Prism](https://github.com/stoplightio/prism) 5.16.0 trên file đó, ở profile `mock` nên `docker compose up` mặc định không chạy nó (lần đầu cần mạng để `npx` tải Prism).
+
+```
+docker compose --profile mock up -d mock-rag     # http://localhost:4010
+# trong .env:
+#   RAG_MODE=http
+#   RAG_BASE_URL=http://mock-rag:4010     # cùng mạng compose, không dùng host.docker.internal
+#   RAG_API_KEY=bat-ky-chuoi-nao          # Prism chỉ kiểm tra có header, không kiểm tra giá trị
+docker compose up -d --build api postgres
+```
+
+Thử thẳng mock bằng curl (mọi endpoint trừ `/v1/health` cần `X-API-Key`):
+
+```
+curl localhost:4010/v1/health
+curl -X POST localhost:4010/v1/indexes -H 'X-API-Key: test-key' -H 'Content-Type: application/json' \
+     -d '{"repo_url":"https://github.com/pallets/flask"}'
+curl localhost:4010/v1/indexes/idx_3f9a1c -H 'X-API-Key: test-key' -H 'Prefer: example=embedding'   # ready | embedding | failed
+curl -X POST localhost:4010/v1/query -H 'X-API-Key: test-key' -H 'Content-Type: application/json' \
+     -d '{"index_id":"idx_3f9a1c","question":"JWT kiem tra o dau?"}'
+curl 'localhost:4010/v1/indexes/idx_3f9a1c/files?path=src/flask/app.py&start=34&end=36' -H 'X-API-Key: test-key'
+curl -i 'localhost:4010/v1/indexes/idx_3f9a1c/files?path=a' -H 'X-API-Key: test-key' -H 'Prefer: code=409'
+```
+
+Chọn `fake` hay Prism:
+
+| | `RAG_MODE=fake` | Prism (`mock-rag`) |
+| --- | --- | --- |
+| Có trạng thái | Có: index đi `pending` -> `ready` qua các lần poll, xoá rồi thì mất | Không: ví dụ cố định, tạo xong GET vẫn ra `ready` |
+| Kiểm tra contract | Không | Có: request sai định dạng bị từ chối theo yaml |
+| Chọn tình huống | URL chứa `too-large` / `invalid` | Header `Prefer: example=...` hoặc `Prefer: code=409` |
+| Dùng khi | Phát triển luồng import/chat end-to-end | Kiểm tra backend đọc đúng JSON và mã lỗi của contract |
+
+Giới hạn của Prism: request sai định dạng có thể ra ví dụ lỗi cố định hoặc 422 `application/problem+json` (không theo `ErrorResponse`; backend rơi về mã theo status). **Không dùng Prism để đánh giá index hay chất lượng RAG**, và không dùng để đo timeout (p95 chỉ đo được trên RAG thật).
 
 Chạy test (cần Docker vì test dựng PostgreSQL thật bằng Testcontainers):
 
@@ -69,7 +106,7 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 | GET | `/api/auth/me` | User hiện tại |
 | GET, POST | `/api/projects` | Danh sách, tạo project (body: `name`, tối đa 100 ký tự) |
 | GET, PUT, DELETE | `/api/projects/{id}` | Chi tiết (kèm repository), đổi tên, xoá |
-| POST | `/api/projects/{id}/repositories` | Import repo GitHub (body: `repoUrl`, `ref` tuỳ chọn, mặc định `main`). Trả 202 |
+| POST | `/api/projects/{id}/repositories` | Import repo GitHub (body: `repoUrl`, `ref` tuỳ chọn; bỏ `ref` thì index nhánh mặc định của repo). Trả 202 |
 | GET | `/api/repositories/{id}` | Trạng thái repository, dùng để poll |
 | DELETE | `/api/repositories/{id}` | Xoá repository |
 | GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn) |
@@ -79,6 +116,8 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 Chưa có: endpoint đọc file cho code viewer (`/api/repositories/{id}/files`, dự kiến Phase F), xoá hoặc đổi tên hội thoại. Cần gì thêm thì báo để thống nhất trước khi backend làm.
 
 `repoUrl` chỉ nhận đúng dạng `https://github.com/<owner>/<repo>`.
+
+**Thay đổi so với trước (ảnh hưởng frontend):** `ref` là tuỳ chọn thật sự. Bỏ `ref` thì backend không gửi `ref` cho RAG, RAG dùng nhánh mặc định của repo (`master`, `develop`, ...; trước đây backend tự điền `main` nên repo dùng `master` bị lỗi). Vì vậy trường `ref` trong response của repository (`POST`/`GET /api/repositories/...`, `GET /api/projects/{id}`) **có thể là `null`**. Frontend nên hiển thị "nhánh mặc định" khi `ref` là `null`, đừng giả định luôn có chuỗi. Import cùng URL lần hai với cùng `ref` (kể cả cùng bỏ trống) trả 409; bỏ trống và `main` tường minh được tính là hai lần import khác nhau.
 
 ### Luồng import và polling
 
@@ -99,6 +138,7 @@ Mọi lỗi là ProblemDetails (JSON). Lỗi validate (400) có thêm `errors` t
 | `NO_REPOSITORY` | 409 | Project chưa import repository nào |
 | `REPOSITORY_FAILED` | 409 | Index thất bại, gợi ý xoá và import lại |
 | `INVALID_REPO`, `REPO_TOO_LARGE` | 422 | URL không hỗ trợ hoặc repository quá lớn |
+| `INVALID_REQUEST` | 422 | RAG từ chối request không hợp lệ (validation). Thông báo chung "Yêu cầu không hợp lệ" |
 | `LLM_ERROR` | 502 | Hệ thống AI lỗi tạm thời, cho thử lại |
 | `RAG_UNAVAILABLE` | 502 | Không kết nối được hệ thống AI |
 | `TIMEOUT` | 504 | Hệ thống AI trả lời quá hạn, cho thử lại |
@@ -123,7 +163,7 @@ Với `RAG_MODE=fake`: index tự chuyển `cloning`, `parsing`, `embedding`, `r
 - Frontend làm trong `frontend/`, nên dùng nhánh dạng `feature/fe-*` để tránh đụng nhánh backend.
 - Không commit secret. Mọi cấu hình nhạy cảm nằm trong `.env` (đã được git bỏ qua), mẫu ở `.env.example`.
 - Thay đổi API (đường dẫn, field, mã lỗi) cần nêu rõ trong PR và cập nhật README này để hai bên không lệch nhau.
-- Không sửa `contracts/openapi.yaml` hay repo RAG. Cần đổi contract thì báo Giang.
+- Không sửa `contracts/openapi.yaml` hay repo RAG. Cần đổi contract thì báo Giang (cách cập nhật bản pin: [contracts/README.md](contracts/README.md)).
 
 ## Tài liệu và tiến độ
 
