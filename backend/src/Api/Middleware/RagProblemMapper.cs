@@ -28,6 +28,8 @@ public static class RagProblemMapper
                 "Khoảng dòng yêu cầu không hợp lệ (tối đa 2000 dòng mỗi lần).", RagErrorCodes.InvalidRange),
             RagFailureKind.Invalid when ex.Code == RagErrorCodes.RepoTooLarge => (422, "Repository quá lớn",
                 "Repository vượt quá giới hạn kích thước được hỗ trợ.", RagErrorCodes.RepoTooLarge),
+            RagFailureKind.Invalid when ex.Code == RagErrorCodes.InvalidRequest => (422, "Yêu cầu không hợp lệ",
+                "Yêu cầu không hợp lệ.", RagErrorCodes.InvalidRequest),
             RagFailureKind.Invalid => (422, "Repository không hợp lệ",
                 "URL repository không hợp lệ hoặc không được hỗ trợ.", ex.Code),
 

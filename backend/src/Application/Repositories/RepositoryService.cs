@@ -27,7 +27,7 @@ public class RepositoryService(
 
         await importValidator.EnsureValidAsync(request, ct);
         GitHubRepoUrl.TryNormalize(request.RepoUrl, out var repoUrl);
-        var gitRef = request.Ref ?? GitHubRepoUrl.DefaultRef;
+        var gitRef = request.Ref; // null = let RAG use the default branch (never guess "main")
 
         var duplicate = await db.Repositories.AnyAsync(r =>
             r.ProjectId == projectId && r.RepoUrl == repoUrl && r.Ref == gitRef && r.Status != IndexStatus.Failed, ct);

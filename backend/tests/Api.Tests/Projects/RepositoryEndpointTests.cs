@@ -62,12 +62,12 @@ public class RepositoryEndpointTests(ApiFactory factory)
         var repo = (await response.Content.ReadFromJsonAsync<RepositoryDto>())!;
         Assert.Equal("pending", repo.Status);
         Assert.Equal(Url, repo.RepoUrl);
-        Assert.Equal("main", repo.Ref);
+        Assert.Null(repo.Ref); // no ref typed by the user: nothing is guessed
         Assert.True(repo.IsActive);
 
         var call = Assert.Single(rag.Created);
         Assert.Equal(Url, call.Url);
-        Assert.Equal("main", call.Ref);
+        Assert.Null(call.Ref); // contract: omit `ref` so RAG uses the default branch (master, develop, ...)
         Assert.Equal(repo.Id.ToString(), call.ClientRef); // our repository id is RAG's client_ref (D12)
     }
 
@@ -169,6 +169,7 @@ public class RepositoryEndpointTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
 
         await ImportAsync(client, project.Id, Url, "develop");
+        await ImportAsync(client, project.Id, Url, "main"); // an explicit ref is a different import from "default branch"
     }
 
     [Fact]

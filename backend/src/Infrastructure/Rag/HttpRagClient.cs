@@ -39,7 +39,7 @@ public class HttpRagClient(
         }
     }
 
-    public async Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string gitRef, string clientRef, CancellationToken ct = default)
+    public async Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string? gitRef, string clientRef, CancellationToken ct = default)
     {
         var body = await SendAsync(HttpMethod.Post, "v1/indexes", new CreateIndexBody(repoUrl, gitRef, clientRef),
             _options.RequestTimeout, true, ct);
@@ -184,7 +184,7 @@ public class HttpRagClient(
             RagErrorCodes.Unauthorized => RagFailureKind.Unauthorized,
             RagErrorCodes.RepoNotFound or RagErrorCodes.IndexNotFound or RagErrorCodes.FileNotFound => RagFailureKind.NotFound,
             RagErrorCodes.IndexNotReady => RagFailureKind.NotReady,
-            RagErrorCodes.RepoTooLarge or RagErrorCodes.InvalidRepo or RagErrorCodes.InvalidRange => RagFailureKind.Invalid,
+            RagErrorCodes.RepoTooLarge or RagErrorCodes.InvalidRepo or RagErrorCodes.InvalidRequest or RagErrorCodes.InvalidRange => RagFailureKind.Invalid,
             RagErrorCodes.LlmError => RagFailureKind.LlmError,
             RagErrorCodes.Timeout => RagFailureKind.Timeout,
             RagErrorCodes.InternalError => RagFailureKind.Internal,

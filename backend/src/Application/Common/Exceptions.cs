@@ -15,6 +15,9 @@ public sealed class ConflictException(string message, string? code = null) : App
     public string? Code { get; } = code;
 }
 
+/// <summary>The requested line range of a file is invalid (before any call to RAG). Mapped to 400 with code INVALID_RANGE.</summary>
+public sealed class InvalidRangeException(string message) : AppException(message);
+
 public sealed class UnauthorizedException(string message) : AppException(message);
 
 /// <summary>

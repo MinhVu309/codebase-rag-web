@@ -3,8 +3,9 @@ using Domain.Enums;
 
 namespace Application.Rag;
 
-// Shapes follow RAG Contract v0.2 (plan section 0). Replace with the NSwag-generated types once
-// contracts/openapi.yaml is pinned; IRagClient keeps the rest of the app insulated from that change.
+// Shapes follow RAG Contract v0.2 as pinned in contracts/openapi.yaml (see contracts/README.md). The client is
+// hand-written (HttpRagClient) and checked against the yaml examples by ContractExampleTests; IRagClient keeps the
+// rest of the app insulated if it is ever swapped for a generated one.
 
 public record RagIndexCreated(string IndexId, IndexStatus Status);
 

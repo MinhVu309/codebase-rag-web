@@ -122,7 +122,7 @@ public class HttpRagClientTests
         {"answer":"It lives in Foo [1].",
          "citations":[{"ref_id":1,"file_path":"src/Foo.cs","symbol":"Foo","symbol_kind":"class",
                        "start_line":10,"end_line":20,"snippet":"class Foo {}","score":0.87}],
-         "usage":{"prompt_tokens":10,"completion_tokens":5},"latency_ms":812}
+         "usage":{"input_tokens":10,"output_tokens":5},"latency_ms":812}
         """;
         var handler = new StubHandler().Respond(HttpStatusCode.OK, json);
 
@@ -132,7 +132,7 @@ public class HttpRagClientTests
         var c = Assert.Single(answer.Citations);
         Assert.Equal(new RagCitation(1, "src/Foo.cs", "Foo", "class", 10, 20, "class Foo {}", 0.87), c);
         Assert.Equal(812, answer.LatencyMs);
-        Assert.Equal(10, answer.Usage!.Value.GetProperty("prompt_tokens").GetInt32());
+        Assert.Equal(10, answer.Usage!.Value.GetProperty("input_tokens").GetInt32());
 
         using var body = JsonDocument.Parse(handler.Requests[0].Body!);
         var root = body.RootElement;
