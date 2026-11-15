@@ -111,10 +111,12 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 | GET | `/api/repositories/{id}/files` | Code viewer: đọc một đoạn file của bản đã index (`?path=&start=&end=`, xem "Code viewer" bên dưới) |
 | DELETE | `/api/repositories/{id}` | Xoá repository |
 | GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn) |
+| PATCH | `/api/conversations/{id}` | Đổi tên hội thoại (body: `title`, xem "Quản lý hội thoại" bên dưới). Trả 200 với `ConversationDto` |
+| DELETE | `/api/conversations/{id}` | Xoá hội thoại cùng toàn bộ tin nhắn và citation của nó. Trả 204 |
 | GET | `/api/conversations/{id}/messages` | Lịch sử tin nhắn (`?limit=`, mặc định 200, tối đa 500) |
 | POST | `/api/conversations/{id}/messages` | Hỏi một câu (body: `question` tối đa 2000 ký tự, `topK` từ 1 đến 20 tuỳ chọn) |
 
-Chưa có: xoá hoặc đổi tên hội thoại. Cần gì thêm thì báo để thống nhất trước khi backend làm.
+Cần gì thêm thì báo để thống nhất trước khi backend làm.
 
 `repoUrl` chỉ nhận đúng dạng `https://github.com/<owner>/<repo>`.
 
@@ -167,6 +169,21 @@ Response (camelCase):
 ```
 
 `language` có thể là `null` (RAG không nhận ra ngôn ngữ), `commitSha` là commit repository đã được index (có thể `null`). `content` là **nguyên văn** (kể cả `<script>` hay markdown): frontend phải escape khi render. Mốc dòng trong citation (`startLine`, `endLine`) dùng được trực tiếp làm `start`, `end`.
+
+### Quản lý hội thoại
+
+**Đổi tên:** `PATCH /api/conversations/{id}` với body `{ "title": "..." }`.
+
+- `title` bắt buộc. Backend cắt khoảng trắng hai đầu rồi mới kiểm tra: phải dài 1 đến **200** ký tự và không chứa ký tự điều khiển (xuống dòng, tab, ...). Backend lưu và trả về bản đã cắt, nên frontend nên hiển thị giá trị trong response thay vì giá trị người dùng gõ.
+- Thành công: **200** với `{ id, projectId, title, createdAt }` (cùng dạng với response của `POST /api/projects/{id}/conversations`; không có `lastActivityAt` và `messageCount`, hãy giữ các giá trị đó từ danh sách đã tải).
+- Title sai: **400** ProblemDetails, `errors.Title` là danh sách thông báo (cùng định dạng các lỗi validate khác).
+
+**Xoá:** `DELETE /api/conversations/{id}` trả **204**, không có body.
+
+- Xoá cứng và không hoàn tác: hội thoại, toàn bộ tin nhắn và citation đã lưu của nó biến mất. Nên hỏi xác nhận trước khi gọi. Các hội thoại khác và repository không bị ảnh hưởng, RAG không được gọi.
+- Sau khi xoá, mọi gọi tới hội thoại đó (xem tin nhắn, hỏi tiếp, đổi tên, xoá lần nữa) đều trả 404.
+
+Cả hai: hội thoại của người khác và hội thoại không tồn tại cho cùng một **404** (kiểm tra quyền trước khi validate body, nên body sai trên hội thoại của người khác vẫn là 404). Chưa đăng nhập thì 401.
 
 ### Hiển thị câu trả lời
 
