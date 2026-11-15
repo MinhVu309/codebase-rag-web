@@ -52,7 +52,7 @@ internal class CodeRepositoryConfiguration : IEntityTypeConfiguration<CodeReposi
         b.ToTable("repositories");
         b.HasKey(x => x.Id);
         b.Property(x => x.RepoUrl).HasMaxLength(500).IsRequired();
-        b.Property(x => x.Ref).HasMaxLength(255).IsRequired();
+        b.Property(x => x.Ref).HasMaxLength(255);
         b.Property(x => x.IndexId).HasMaxLength(200);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.Stage).HasMaxLength(50);

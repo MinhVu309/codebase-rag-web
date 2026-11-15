@@ -4,7 +4,7 @@ using Domain.Enums;
 
 namespace Application.Repositories;
 
-/// <summary>Omitting <c>Ref</c> uses <see cref="GitHubRepoUrl.DefaultRef"/>.</summary>
+/// <summary>Omitting <c>Ref</c> makes RAG index the repository's default branch.</summary>
 public record ImportRepositoryRequest(string? RepoUrl, string? Ref);
 
 /// <summary>
@@ -15,7 +15,7 @@ public record RepositoryDto(
     Guid Id,
     Guid ProjectId,
     string RepoUrl,
-    string Ref,
+    string? Ref,
     string Status,
     string? Stage,
     int FilesDone,

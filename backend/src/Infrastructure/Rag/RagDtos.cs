@@ -13,7 +13,7 @@ internal static class RagJson
     };
 }
 
-internal record CreateIndexBody(string RepoUrl, string Ref, string ClientRef);
+internal record CreateIndexBody(string RepoUrl, string? Ref, string ClientRef);
 
 internal record CreateIndexResponse(string? IndexId, string? Status);
 

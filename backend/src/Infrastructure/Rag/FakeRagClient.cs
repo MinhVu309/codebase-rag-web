@@ -29,7 +29,7 @@ public class FakeRagClient : IRagClient
 
     public Task<bool> IsHealthyAsync(CancellationToken ct = default) => Task.FromResult(true);
 
-    public Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string gitRef, string clientRef, CancellationToken ct = default)
+    public Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string? gitRef, string clientRef, CancellationToken ct = default)
     {
         if (repoUrl.Contains("invalid", StringComparison.OrdinalIgnoreCase))
             throw new RagException(RagFailureKind.Invalid, RagErrorCodes.InvalidRepo, 422);

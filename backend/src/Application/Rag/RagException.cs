@@ -29,6 +29,8 @@ public static class RagErrorCodes
     public const string RepoNotFound = "REPO_NOT_FOUND";
     public const string RepoTooLarge = "REPO_TOO_LARGE";
     public const string InvalidRepo = "INVALID_REPO";
+    /// <summary>422 validation error. Not in the original 11 codes of Contract v0.2; added by openapi.yaml (see contracts/README.md).</summary>
+    public const string InvalidRequest = "INVALID_REQUEST";
     public const string IndexNotReady = "INDEX_NOT_READY";
     public const string IndexNotFound = "INDEX_NOT_FOUND";
     public const string FileNotFound = "FILE_NOT_FOUND";
