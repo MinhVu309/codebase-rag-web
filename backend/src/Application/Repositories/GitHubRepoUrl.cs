@@ -17,8 +17,6 @@ public static partial class GitHubRepoUrl
     [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$")]
     private static partial Regex RefPattern();
 
-    public const string DefaultRef = "main";
-
     /// <summary>Accepts one trailing slash and a trailing ".git" and returns the canonical form.</summary>
     public static bool TryNormalize(string? input, out string normalized)
     {

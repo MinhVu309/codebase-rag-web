@@ -57,7 +57,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnName("project_id");
 
                     b.Property<string>("Ref")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("ref");

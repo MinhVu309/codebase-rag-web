@@ -8,7 +8,9 @@ public class CodeRepository
     public Guid Id { get; set; }
     public Guid ProjectId { get; set; }
     public string RepoUrl { get; set; } = string.Empty;
-    public string Ref { get; set; } = string.Empty;
+
+    /// <summary>Branch, tag or commit the user asked for; null = RAG used the repository's default branch.</summary>
+    public string? Ref { get; set; }
 
     /// <summary>RAG <c>index_id</c>; null until <c>POST /v1/indexes</c> succeeds.</summary>
     public string? IndexId { get; set; }

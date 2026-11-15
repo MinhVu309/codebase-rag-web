@@ -6,7 +6,7 @@ namespace Api.Tests.Projects;
 /// <summary>Programmable IRagClient for Phase D tests: records calls and can be told to fail.</summary>
 public class RecordingRagClient : IRagClient
 {
-    public List<(string Url, string Ref, string ClientRef)> Created { get; } = [];
+    public List<(string Url, string? Ref, string ClientRef)> Created { get; } = [];
     public List<string> Deleted { get; } = [];
     public int GetCalls { get; private set; }
     public List<(string IndexId, string Question, int TopK, RagQueryOptions Options)> Queries { get; } = [];
@@ -24,7 +24,7 @@ public class RecordingRagClient : IRagClient
 
     public Task<bool> IsHealthyAsync(CancellationToken ct = default) => Task.FromResult(true);
 
-    public Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string gitRef, string clientRef, CancellationToken ct = default)
+    public Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string? gitRef, string clientRef, CancellationToken ct = default)
     {
         if (CreateError is not null) throw CreateError;
         Created.Add((repoUrl, gitRef, clientRef));

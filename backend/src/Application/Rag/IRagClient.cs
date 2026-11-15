@@ -9,8 +9,11 @@ public interface IRagClient
     /// <summary>GET /v1/health. Never throws; false when RAG is unreachable or unhealthy.</summary>
     Task<bool> IsHealthyAsync(CancellationToken ct = default);
 
-    /// <summary>POST /v1/indexes. Not retried automatically.</summary>
-    Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string gitRef, string clientRef, CancellationToken ct = default);
+    /// <summary>
+    /// POST /v1/indexes. Not retried automatically. A null <paramref name="gitRef"/> is not sent, so RAG indexes
+    /// the repository's default branch (contract: <c>ref</c> is optional).
+    /// </summary>
+    Task<RagIndexCreated> CreateIndexAsync(string repoUrl, string? gitRef, string clientRef, CancellationToken ct = default);
 
     /// <summary>GET /v1/indexes/{id}. Retried up to 2 times on transient failures.</summary>
     Task<RagIndexStatus> GetIndexAsync(string indexId, CancellationToken ct = default);
