@@ -28,6 +28,15 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetails, ILogger<
                 problem = new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Conflict", Detail = c.Message };
                 if (c.Code is not null) problem.Extensions["code"] = c.Code;
                 break;
+            case InvalidRangeException r:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Khoảng dòng không hợp lệ",
+                    Detail = r.Message,
+                };
+                problem.Extensions["code"] = RagErrorCodes.InvalidRange;
+                break;
             case UnauthorizedException u:
                 problem = new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized", Detail = u.Message };
                 break;

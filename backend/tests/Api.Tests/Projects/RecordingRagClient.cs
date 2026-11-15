@@ -54,8 +54,19 @@ public class RecordingRagClient : IRagClient
         ],
         null, 812);
 
-    public Task<RagFile> GetFileAsync(string indexId, string path, int start, int end, CancellationToken ct = default) =>
-        throw new NotSupportedException();
+    public List<(string IndexId, string Path, int Start, int End)> FileCalls { get; } = [];
+    public RagException? FileError { get; set; }
+
+    /// <summary>File returned by GetFileAsync; defaults to the requested slice of a canned file.</summary>
+    public Func<(string IndexId, string Path, int Start, int End), RagFile>? OnGetFile { get; set; }
+
+    public Task<RagFile> GetFileAsync(string indexId, string path, int start, int end, CancellationToken ct = default)
+    {
+        FileCalls.Add((indexId, path, start, end));
+        if (FileError is not null) throw FileError;
+        return Task.FromResult(OnGetFile?.Invoke((indexId, path, start, end))
+                               ?? new RagFile(path, start, Math.Min(end, start + 2), "line one\nline two\nline three\n", "csharp"));
+    }
 
     public Task DeleteIndexAsync(string indexId, CancellationToken ct = default)
     {
