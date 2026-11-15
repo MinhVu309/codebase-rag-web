@@ -24,6 +24,25 @@ public class CreateConversationRequestValidator : AbstractValidator<CreateConver
             .When(x => x.Title is not null);
 }
 
+public class UpdateConversationRequestValidator : AbstractValidator<UpdateConversationRequest>
+{
+    public UpdateConversationRequestValidator()
+    {
+        // Everything below judges the trimmed title, which is also what gets stored.
+        RuleFor(x => x.Title)
+            .Must(t => !string.IsNullOrWhiteSpace(t)).WithMessage("'Title' must not be empty.");
+        When(x => !string.IsNullOrWhiteSpace(x.Title), () =>
+        {
+            RuleFor(x => x.Title!)
+                .Must(t => t.Trim().Length <= ChatRules.MaxTitleLength)
+                .WithMessage($"'Title' must be at most {ChatRules.MaxTitleLength} characters.");
+            RuleFor(x => x.Title!)
+                .Must(t => !t.Trim().Any(char.IsControl))
+                .WithMessage("'Title' must not contain control characters (such as line breaks).");
+        });
+    }
+}
+
 public class AskRequestValidator : AbstractValidator<AskRequest>
 {
     public AskRequestValidator()

@@ -1,5 +1,6 @@
 using Application.Chat;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -18,6 +19,20 @@ public class ConversationsController(ChatService chat) : ControllerBase
     {
         var conversation = await chat.CreateConversationAsync(User.GetUserId(), projectId, request, ct);
         return CreatedAtAction(nameof(Messages), new { id = conversation.Id }, conversation);
+    }
+
+    /// <summary>Renames a conversation (title 1-200 characters after trimming). 404 if it is not yours.</summary>
+    [HttpPatch("api/conversations/{id:guid}")]
+    public async Task<ConversationDto> Rename(Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] UpdateConversationRequest? request, CancellationToken ct) =>
+        await chat.RenameConversationAsync(User.GetUserId(), id, request, ct);
+
+    /// <summary>Deletes a conversation with all its messages and citation snapshots. 404 if it is not yours.</summary>
+    [HttpDelete("api/conversations/{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await chat.DeleteConversationAsync(User.GetUserId(), id, ct);
+        return NoContent();
     }
 
     /// <summary>Latest <c>limit</c> messages (default 200, max 500), oldest first.</summary>

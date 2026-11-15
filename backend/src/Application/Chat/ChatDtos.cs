@@ -5,6 +5,9 @@ namespace Application.Chat;
 
 public record CreateConversationRequest(string? Title);
 
+/// <summary>Rename. <c>Title</c> is required; it is trimmed, then must be 1-<see cref="ChatRules.MaxTitleLength"/> characters with no control characters.</summary>
+public record UpdateConversationRequest(string? Title);
+
 /// <summary>A single-turn question (RAG keeps no history). <c>TopK</c> defaults to <see cref="ChatRules.DefaultTopK"/>.</summary>
 public record AskRequest(string? Question, int? TopK);
 
