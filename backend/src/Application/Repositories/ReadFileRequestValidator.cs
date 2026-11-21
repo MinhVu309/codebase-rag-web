@@ -18,8 +18,8 @@ public class ReadFileRequestValidator : AbstractValidator<ReadFileRequest>
                 .MaximumLength(FileRules.MaxPathLength)
                 .WithMessage($"'Path' must be at most {FileRules.MaxPathLength} characters.");
             RuleFor(x => x.Path!)
-                .Must(p => !p.Contains("..", StringComparison.Ordinal))
-                .WithMessage("'Path' must not contain '..'.");
+                .Must(p => !p.Split('/', '\\').Contains(".."))
+                .WithMessage("'Path' must not contain '..' segments.");
             RuleFor(x => x.Path!)
                 .Must(p => !p.StartsWith('/') && !p.StartsWith('\\'))
                 .WithMessage("'Path' must be relative to the repository root (no leading '/' or '\\').");
