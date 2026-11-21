@@ -8,6 +8,7 @@ Mới nhất ở trên cùng.
 
 | Ngày | Báo cáo | Phạm vi |
 | --- | --- | --- |
+| 2026-11-21 | [Rà soát và tăng cường bảo mật](reports/security-review-2026-11.md) | Rate limit, CORS, security header, giới hạn body, rà log và quyền sở hữu; checklist D10/D11/D21/D22 |
 | 2026-11-21 | [E2E với RAG thật chạy local](reports/e2e-local-2026-11-21.md) | Chat, citation, lịch sử, lỗi, cách ly user; đo latency và chốt timeout 65s |
 | 2026-11-06 | [Tiến độ đến Phase E](reports/2026-11-06-progress-phase-a-e.md) | Phase A đến E |
 

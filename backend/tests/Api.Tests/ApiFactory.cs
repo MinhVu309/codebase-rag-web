@@ -32,6 +32,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             ["DATABASE_URL"] = _postgres.GetConnectionString(),
             ["RAG_MODE"] = "fake",
+            // The suite shares one factory and one (null) client IP, and several tests import more than one repository
+            // at a time, so the limits are off here. Tests of the limits switch them on through WithWebHostBuilder.
+            ["RATE_LIMIT_AUTH_PER_MINUTE"] = "0",
+            ["RATE_LIMIT_ASK_PER_MINUTE"] = "0",
+            ["RATE_LIMIT_IMPORT_PER_WINDOW"] = "0",
+            ["MAX_CONCURRENT_IMPORTS_PER_USER"] = "0",
             ["JWT_SECRET"] = JwtSecret,
             ["JWT_ISSUER"] = JwtIssuer,
             ["JWT_AUDIENCE"] = JwtAudience,

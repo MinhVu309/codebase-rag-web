@@ -1,7 +1,9 @@
+using Api.Security;
 using Application.Chat;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
@@ -42,6 +44,7 @@ public class ConversationsController(ChatService chat) : ControllerBase
 
     /// <summary>Asks one question. Stores the user message and the answer (with its citation snapshot).</summary>
     [HttpPost("api/conversations/{id:guid}/messages")]
+    [EnableRateLimiting(RateLimitPolicies.Ask)]
     [ProducesResponseType<AskResultDto>(StatusCodes.Status201Created)]
     public async Task<IActionResult> Ask(Guid id, AskRequest request, CancellationToken ct)
     {

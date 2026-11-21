@@ -1,6 +1,8 @@
+using Api.Security;
 using Application.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
@@ -10,6 +12,7 @@ public class RepositoriesController(RepositoryService repositories, CodeFileServ
 {
     /// <summary>Starts indexing. Returns 202 with the repository in <c>pending</c>; poll GET for progress.</summary>
     [HttpPost("api/projects/{projectId:guid}/repositories")]
+    [EnableRateLimiting(RateLimitPolicies.Import)]
     [ProducesResponseType<RepositoryDto>(StatusCodes.Status202Accepted)]
     public async Task<IActionResult> Import(Guid projectId, ImportRepositoryRequest request, CancellationToken ct)
     {
