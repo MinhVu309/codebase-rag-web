@@ -188,7 +188,7 @@ Giá trị mặc định (đổi bằng biến môi trường, xem `.env.example
 | Repository đang index cùng lúc | 1 | mỗi user (qua mọi project) |
 | Kích thước body | 64 KB | mọi request |
 
-Vượt giới hạn tốc độ: `429` kèm `code: "RATE_LIMITED"` và header `Retry-After`. Hiển thị "Bạn thao tác quá nhanh, thử lại sau N giây" và khoá nút gửi trong N giây. Nếu nhiều người dùng chung một IP (lớp học, văn phòng) và gặp giới hạn đăng nhập, tăng `RATE_LIMIT_AUTH_PER_MINUTE`.
+Vượt giới hạn tốc độ: `429` kèm `code: "RATE_LIMITED"` và header `Retry-After`. Hiển thị "Bạn thao tác quá nhanh, thử lại sau N giây" và khoá nút gửi trong N giây. Nếu nhiều người dùng chung một IP và gặp giới hạn đăng nhập thì tăng `RATE_LIMIT_AUTH_PER_MINUTE`. Chạy local, mọi request qua proxy của dev server hoặc qua mạng Docker đều mang cùng một IP trong mắt backend, nên giới hạn này là chung cho cả nhóm: khi demo đặt `RATE_LIMIT_AUTH_PER_MINUTE=60` trong `.env` (mặc định 10 giữ nguyên cho lúc không demo).
 
 **Chạy sau nginx:** đặt `TRUSTED_PROXIES` là địa chỉ hoặc dải mạng của nginx (ví dụ `172.18.0.0/16` trong mạng compose), nginx phải gửi `X-Forwarded-For`. Không đặt thì backend bỏ qua header đó và coi mọi client là địa chỉ của nginx, làm giới hạn theo IP áp lên tất cả người dùng cùng lúc.
 

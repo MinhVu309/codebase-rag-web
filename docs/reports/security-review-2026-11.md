@@ -79,7 +79,7 @@ Hệ quả cần biết: kịch bản E2E đã chạy trước đó (import hai 
 ## Rủi ro còn lại
 
 1. **Bộ đếm rate limit nằm trong bộ nhớ của một process.** Chạy một instance `api` thì đúng; chạy nhiều instance thì mỗi instance đếm riêng (giới hạn thực tế nhân lên) và khởi động lại thì đếm lại từ 0.
-2. **Giới hạn đăng nhập theo IP, không theo tài khoản.** Nhiều người chung một IP (lớp học, văn phòng) dùng chung 10 lần mỗi phút; ngược lại kẻ tấn công đổi IP vẫn thử được một tài khoản. Chưa khóa theo tài khoản vì dễ bị lợi dụng để khóa người khác.
+2. **Giới hạn đăng nhập theo IP, không theo tài khoản.** Nhiều người chung một IP (lớp học, văn phòng, hoặc mọi request đi qua proxy của dev server hay mạng Docker) dùng chung 10 lần mỗi phút (demo: nâng lên 60 trong `.env`); ngược lại kẻ tấn công đổi IP vẫn thử được một tài khoản. Chưa khóa theo tài khoản vì dễ bị lợi dụng để khóa người khác.
 3. **Không có trần tổng cho toàn hệ thống.** Nhiều user mỗi người một import vẫn xếp hàng ở RAG một worker; không giới hạn số project hay repository mỗi user; số câu hỏi đồng thời toàn hệ thống không giới hạn (mỗi user tối đa 10 mỗi phút, mỗi câu tới 65 giây).
 4. **Đăng ký mở, không xác minh email.** Rate limit chỉ làm chậm việc tạo tài khoản hàng loạt.
 5. **Access token không thu hồi được trước hạn.** Đăng xuất thu hồi refresh token nhưng access token (15 phút) còn dùng được tới khi hết hạn.
@@ -104,12 +104,13 @@ curl -si localhost:8080/health     # xem các security header
 
 Các test mới nằm trong `backend/tests/Api.Tests/Security/`: `RateLimitTests`, `HttpHardeningTests`, `SecurityOptionsTests`, `OwnershipMatrixTests`, `LogHygieneTests`.
 
-## Câu hỏi cần xác nhận
+## Quyết định đã nhận (21/11)
 
-- [ ] Nhóm Web: mặc định 10 lần mỗi phút mỗi IP cho đăng nhập có đủ cho buổi demo (nhiều người cùng mạng)? Nếu không thì tăng `RATE_LIMIT_AUTH_PER_MINUTE`.
-- [ ] Nhóm Web: mỗi user 1 repository đang index một lúc có ổn cho demo (D28 chuẩn bị sẵn repo index trước)?
-- [ ] Thành viên frontend: xử lý `429` (đọc `Retry-After`), `409 IMPORT_IN_PROGRESS`, `413`, timeout 75 giây cho gửi tin nhắn, và escape markdown/HTML của câu trả lời.
-- [ ] Người dựng nginx: đặt `TRUSTED_PROXIES`, TLS, HSTS, `AllowedHosts`.
+- Giới hạn đăng nhập giữ mặc định **10 lần mỗi phút mỗi IP** (an toàn). Khi demo đặt `RATE_LIMIT_AUTH_PER_MINUTE=60` trong `.env`. Lý do: nếu frontend gọi qua proxy của dev server, hoặc mọi request đi qua mạng Docker, backend thấy mọi người dùng cùng một IP, nên giới hạn này là chung cho cả lớp. Đã kiểm trên môi trường thật: request từ máy host tới `localhost:8080` đều đến backend với cùng địa chỉ cổng Docker.
+- Mỗi user một repository đang index cùng lúc: chấp nhận, vì RAG cũng chỉ có một tiến trình index. Khi demo, import sẵn repo từ trước (D28).
+- Chạy lại E2E thì tắt hai giới hạn: `RATE_LIMIT_ASK_PER_MINUTE=0` và `MAX_CONCURRENT_IMPORTS_PER_USER=0`.
+- Frontend: các điểm cần biết (429 kèm `Retry-After`, 409 `IMPORT_IN_PROGRESS`, 413 `REQUEST_TOO_LARGE`, timeout 75 giây, dùng proxy của dev server thay vì CORS, tự escape markdown và HTML) sẽ được đưa vào mục dành cho frontend ở Notion trang 01 sau khi PR merge.
+- Nginx (`TRUSTED_PROXIES`, TLS, HSTS, `AllowedHosts`): để sang lúc deploy (mục I). Deploy đang hoãn và demo chạy local nên chưa làm.
 
 ## Bước tiếp theo
 
