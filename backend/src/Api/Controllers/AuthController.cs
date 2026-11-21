@@ -1,7 +1,9 @@
 using Application.Auth;
 using Application.Common;
 using Microsoft.AspNetCore.Authorization;
+using Api.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
@@ -10,6 +12,7 @@ namespace Api.Controllers;
 public class AuthController(AuthService auth, AuthCookies cookies) : ControllerBase
 {
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
     {
@@ -19,6 +22,7 @@ public class AuthController(AuthService auth, AuthCookies cookies) : ControllerB
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<ActionResult<UserDto>> Login(LoginRequest request, CancellationToken ct)
     {
         var result = await auth.LoginAsync(request, ct);
@@ -27,6 +31,7 @@ public class AuthController(AuthService auth, AuthCookies cookies) : ControllerB
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<ActionResult<UserDto>> Refresh(CancellationToken ct)
     {
         try

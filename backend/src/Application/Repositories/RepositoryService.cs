@@ -14,11 +14,14 @@ public class RepositoryService(
     IAppDbContext db,
     IRagClient rag,
     IValidator<ImportRepositoryRequest> importValidator,
+    ImportLimits limits,
     TimeProvider clock,
     ILogger<RepositoryService> logger)
 {
     /// <summary>An import whose RAG call never returned an index id (e.g. process died) is given up on after this.</summary>
     private static readonly TimeSpan InterruptedImportAfter = TimeSpan.FromMinutes(5);
+
+    public const string ImportInProgressCode = "IMPORT_IN_PROGRESS";
 
     public async Task<RepositoryDto> ImportAsync(Guid userId, Guid projectId, ImportRepositoryRequest request, CancellationToken ct)
     {
@@ -33,6 +36,8 @@ public class RepositoryService(
             r.ProjectId == projectId && r.RepoUrl == repoUrl && r.Ref == gitRef && r.Status != IndexStatus.Failed, ct);
         if (duplicate)
             throw new ConflictException("This repository (and ref) is already imported in the project.");
+
+        await EnsureNoImportInProgressAsync(userId, ct);
 
         var now = clock.GetUtcNow();
         var repo = new CodeRepository
@@ -69,6 +74,26 @@ public class RepositoryService(
         }
 
         return RepositoryDto.From(repo, project.ActiveIndexId);
+    }
+
+    /// <summary>
+    /// One index job costs a clone plus embedding in RAG (which runs a single worker), so a user may only have
+    /// <see cref="ImportLimits.MaxConcurrentPerUser"/> of them running. Stored statuses are refreshed first: they only
+    /// move when somebody polls, and a job that already finished must not keep the user locked out.
+    /// </summary>
+    private async Task EnsureNoImportInProgressAsync(Guid userId, CancellationToken ct)
+    {
+        if (limits.MaxConcurrentPerUser <= 0) return;
+
+        var building = await db.Repositories.Include(r => r.Project)
+            .Where(r => r.Project.UserId == userId && r.Status != IndexStatus.Ready && r.Status != IndexStatus.Failed)
+            .ToListAsync(ct);
+        foreach (var r in building) await RefreshAsync(r, ct);
+
+        if (building.Count(r => !RepositoryDto.IsTerminal(r.Status)) >= limits.MaxConcurrentPerUser)
+            throw new ConflictException(
+                "Bạn đang có repository đang được index. Chờ nó xong (ready hoặc failed) rồi import tiếp.",
+                ImportInProgressCode);
     }
 
     /// <summary>Returns the latest status; asks RAG only while the index is still being built.</summary>

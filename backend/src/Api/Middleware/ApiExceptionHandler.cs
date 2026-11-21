@@ -40,6 +40,15 @@ public class ApiExceptionHandler(IProblemDetailsService problemDetails, ILogger<
             case UnauthorizedException u:
                 problem = new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized", Detail = u.Message };
                 break;
+            case BadHttpRequestException b:
+                // Kestrel (or RequestSizeLimitMiddleware) refusing the request itself; keep its status, never a 500.
+                problem = new ProblemDetails
+                {
+                    Status = b.StatusCode,
+                    Title = b.StatusCode == StatusCodes.Status413PayloadTooLarge ? "Request body too large" : "Bad request",
+                };
+                if (b.StatusCode == StatusCodes.Status413PayloadTooLarge) problem.Extensions["code"] = "REQUEST_TOO_LARGE";
+                break;
             case RagException r:
                 problem = RagProblemMapper.ToProblem(r);
                 logger.LogWarning("RAG call failed: {Kind} {Code} (upstream {Status})", r.Kind, r.Code, r.UpstreamStatus);
