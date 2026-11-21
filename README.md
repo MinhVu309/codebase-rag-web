@@ -2,23 +2,39 @@
 
 Ứng dụng web hỏi đáp về một codebase GitHub công khai: người dùng đăng nhập, import một repository, chờ hệ thống index xong rồi đặt câu hỏi bằng ngôn ngữ tự nhiên và nhận câu trả lời kèm trích dẫn (citation) trỏ tới file và dòng code.
 
-Repo này gồm **Web Backend** (đã có) và **Frontend** (do thành viên Web còn lại làm). Phần RAG (index và trả lời) là dịch vụ riêng, nằm ở repo `codebase-rag-service` do Giang phụ trách. Repo này không chứa và không sửa code RAG.
+Repo này gồm **Web Backend** (đã có) và **Frontend** (do Phi Anh làm). Phần RAG (index và trả lời) là dịch vụ riêng, nằm ở repo `codebase-rag-service` do Giang phụ trách. Repo này không chứa và không sửa code RAG.
 
 ## Phân công
 
 | Phần | Thư mục | Người làm |
 | --- | --- | --- |
 | Web Backend (.NET 10) | `backend/` | MinhVu309 |
-| Frontend (React) | `frontend/` | Thành viên Web còn lại (điền tên) |
+| Frontend (React) | `frontend/` | Phi Anh |
 | RAG Service | repo `codebase-rag-service` | Giang |
 
 Frontend chỉ nói chuyện với Web Backend qua `/api`. Frontend **không** gọi RAG và không giữ `RAG_API_KEY`.
+
+## Trạng thái (cập nhật 2026-11-21)
+
+**Backend đã xong cho MVP và chạy được với RAG thật** (RAG chạy local của Giang). Đã có:
+
+- Đăng ký, đăng nhập, refresh, đăng xuất bằng cookie HttpOnly; refresh token xoay vòng.
+- Project, import repository GitHub công khai, theo dõi tiến độ index.
+- Chat có citation, lưu lịch sử kèm bản chụp citation; xem, đổi tên, xoá hội thoại.
+- Code viewer: đọc đoạn file của bản đã index để mở citation.
+- Nối RAG thật: chế độ truy vấn `hybrid` (cấu hình được), timeout hỏi RAG 65 giây, đã chạy thử đầu cuối với câu hỏi thật (xem [báo cáo E2E](docs/reports/e2e-local-2026-11-21.md)).
+- Bảo mật: giới hạn tốc độ, giới hạn import đồng thời, giới hạn kích thước body, CORS tuỳ chọn, security header, kiểm quyền sở hữu cho mọi endpoint có id (xem [báo cáo bảo mật](docs/reports/security-review-2026-11.md)).
+- 537 test tự động (xUnit, Testcontainers).
+
+**Còn lại:** frontend (Phi Anh), đóng gói và test tích hợp cho demo, chuẩn bị sẵn một repo đã index. Nginx, TLS và deploy để sau (deploy đang hoãn, demo chạy local).
+
+**Khi demo:** import sẵn repo từ trước; trong `.env` đặt `RATE_LIMIT_AUTH_PER_MINUTE=60` (qua proxy của dev server hoặc mạng Docker, mọi người dùng chung một IP nên giới hạn mặc định 10 lần mỗi phút là chung cho cả nhóm).
 
 ## Cấu trúc thư mục
 
 ```
 backend/            Web API (Api, Application, Domain, Infrastructure) và test
-frontend/           Giao diện React (chưa có, dành cho thành viên FE)
+frontend/           Giao diện React (chưa có, do Phi Anh làm)
 docs/               Báo cáo tiến độ, xem docs/README.md
 contracts/          openapi.yaml của RAG (bản pin, không sửa) và README ghi nguồn/commit/sha256
 docker-compose.yml  api + postgres (+ mock-rag, profile "mock")
@@ -100,7 +116,18 @@ dotnet test
 
 ## Dành cho người làm frontend
 
-Phần này là những gì frontend cần biết để nối với backend hiện tại.
+Phần này dành cho Phi Anh (và bất kỳ ai làm frontend): những gì cần biết để nối với backend hiện tại.
+
+**Các điểm mới cần xử lý ở frontend:**
+
+1. `429 RATE_LIMITED` kèm header `Retry-After` (giây): báo "thao tác quá nhanh, thử lại sau N giây", khoá nút trong N giây.
+2. `409 IMPORT_IN_PROGRESS`: đang có repository khác đang index, bảo người dùng chờ nó xong rồi import tiếp.
+3. `413 REQUEST_TOO_LARGE`: body quá 64 KB.
+4. Timeout gọi `POST /api/conversations/{id}/messages` đặt 75 giây (backend chờ RAG tối đa 65 giây); các API khác 60 giây.
+5. Khi chạy dev server: dùng proxy `/api` của dev server thay vì CORS (CORS chỉ là phương án dự phòng, xem bên dưới).
+6. Tự escape markdown và HTML khi hiển thị câu trả lời, snippet và nội dung file: backend lưu và trả nguyên văn.
+7. Mỗi project chỉ hỏi được trên **một** repository (repo import sau cùng, `isActive: true`).
+
 
 ### Kết nối và xác thực
 
@@ -243,11 +270,15 @@ Với `RAG_MODE=fake`: index tự chuyển `cloning`, `parsing`, `embedding`, `r
 ## Quy trình làm việc chung
 
 - Nhánh `main` luôn ở trạng thái chạy được. Làm trên nhánh `feature/*` hoặc `fix/*`, mở PR, chờ CI xanh rồi merge. Không push thẳng vào `main`.
-- Frontend làm trong `frontend/`, nên dùng nhánh dạng `feature/fe-*` để tránh đụng nhánh backend.
+- Frontend (Phi Anh) làm trong `frontend/`, nên dùng nhánh dạng `feature/fe-*` để tránh đụng nhánh backend.
 - Không commit secret. Mọi cấu hình nhạy cảm nằm trong `.env` (đã được git bỏ qua), mẫu ở `.env.example`.
 - Thay đổi API (đường dẫn, field, mã lỗi) cần nêu rõ trong PR và cập nhật README này để hai bên không lệch nhau.
 - Không sửa `contracts/openapi.yaml` hay repo RAG. Cần đổi contract thì báo Giang (cách cập nhật bản pin: [contracts/README.md](contracts/README.md)).
 
 ## Tài liệu và tiến độ
 
-Báo cáo tiến độ nằm trong [docs/](docs/README.md). Báo cáo mới nhất: [Tiến độ đến Phase E](docs/reports/2026-11-06-progress-phase-a-e.md).
+Báo cáo nằm trong [docs/](docs/README.md). Mới nhất:
+
+- [Rà soát và tăng cường bảo mật](docs/reports/security-review-2026-11.md) (2026-11-21)
+- [E2E với RAG thật chạy local](docs/reports/e2e-local-2026-11-21.md) (2026-11-21)
+- [Tiến độ đến Phase E](docs/reports/2026-11-06-progress-phase-a-e.md) (2026-11-06)
