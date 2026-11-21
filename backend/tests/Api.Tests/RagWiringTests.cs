@@ -40,4 +40,45 @@ public class RagWiringTests(ApiFactory factory)
 
         Assert.ThrowsAny<Exception>(() => app.CreateClient());
     }
+
+    // ---------- RAG_QUERY_MODE / RAG_QUERY_RERANK ----------
+
+    [Fact]
+    public void Query_Options_Default_To_Hybrid_Without_Rerank()
+    {
+        var o = factory.Services.GetRequiredService<RagQueryOptions>();
+
+        Assert.Equal(new RagQueryOptions("hybrid", false), o);
+    }
+
+    [Theory]
+    [InlineData("dense", null, "dense", false)]
+    [InlineData(" Hybrid ", "TRUE", "hybrid", true)]
+    [InlineData("", "", "hybrid", false)]       // blank = unset = defaults
+    public void Query_Options_Are_Read_From_Configuration(string mode, string? rerank, string expectedMode, bool expectedRerank)
+    {
+        using var app = WithRag(("RAG_QUERY_MODE", mode), ("RAG_QUERY_RERANK", rerank));
+
+        Assert.Equal(new RagQueryOptions(expectedMode, expectedRerank), app.Services.GetRequiredService<RagQueryOptions>());
+    }
+
+    [Theory]
+    [InlineData("hybird", null)]        // typo
+    [InlineData("sparse", "false")]     // not a mode RAG knows
+    [InlineData("hybrid", "yes")]       // not a boolean
+    [InlineData("dense", "true")]       // rerank needs hybrid
+    public void Bad_Query_Options_Fail_Fast_On_Startup(string mode, string? rerank)
+    {
+        using var app = WithRag(("RAG_QUERY_MODE", mode), ("RAG_QUERY_RERANK", rerank));
+
+        Assert.ThrowsAny<Exception>(() => app.CreateClient());
+    }
+
+    [Fact]
+    public void Rerank_Alone_Uses_The_Default_Hybrid_Mode()
+    {
+        using var app = WithRag(("RAG_QUERY_RERANK", "true"));
+
+        Assert.Equal(new RagQueryOptions("hybrid", true), app.Services.GetRequiredService<RagQueryOptions>());
+    }
 }

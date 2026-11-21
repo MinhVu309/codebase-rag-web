@@ -73,6 +73,24 @@ Chọn `fake` hay Prism:
 
 Giới hạn của Prism: request sai định dạng có thể ra ví dụ lỗi cố định hoặc 422 `application/problem+json` (không theo `ErrorResponse`; backend rơi về mã theo status). **Không dùng Prism để đánh giá index hay chất lượng RAG**, và không dùng để đo timeout (p95 chỉ đo được trên RAG thật).
 
+### RAG thật chạy local
+
+Repo RAG (`codebase-rag-service`, nhánh `work/wp6-retrieval-reranking`) chạy trên máy ở `http://127.0.0.1:8000` bằng đúng một process uvicorn (không `--workers`). Hướng dẫn dựng nằm trong `docs/web-team-local-handoff.md` của repo đó. Phía web chỉ cần:
+
+```
+# trong .env của web
+RAG_MODE=http
+RAG_BASE_URL=http://host.docker.internal:8000   # api chạy trong Docker; dùng http://127.0.0.1:8000 nếu chạy dotnet run trên máy
+RAG_API_KEY=<cùng giá trị RAG_API_KEY trong .env của RAG>
+RAG_QUERY_MODE=hybrid                            # dense | hybrid
+RAG_QUERY_RERANK=false                           # true chỉ hợp lệ khi mode=hybrid
+```
+
+- `RAG_QUERY_MODE` (mặc định `hybrid`) và `RAG_QUERY_RERANK` (mặc định `false`) được gửi trong `options` của mọi `POST /v1/query`. Giá trị sai (`hybird`, `RAG_QUERY_RERANK=yes`, `rerank=true` với `dense`) làm API không khởi động. Rerank nạp cross-encoder và chậm đáng kể nên chỉ bật khi có quyết định riêng.
+- `RAG_QUERY_TIMEOUT_SECONDS`: RAG đặt `LLM_TIMEOUT_MS=60000`, lớn hơn mặc định 45s của web, nên khi thử với RAG thật tạm đặt 70. Đây là giá trị tạm; chốt lại theo P95 đo được (khoảng 2 lần P95).
+- Từ container không gọi được `host.docker.internal:8000` thì chạy RAG với `--host 0.0.0.0` (chỉ làm khi cần, vì khi đó máy khác trong mạng cũng gọi được cổng 8000, tuy vẫn bị chặn bởi `X-API-Key`).
+- Mỗi người dùng RAG cục bộ riêng: dữ liệu index nằm ở `storage/` của máy chạy RAG, không chia sẻ.
+
 Chạy test (cần Docker vì test dựng PostgreSQL thật bằng Testcontainers):
 
 ```

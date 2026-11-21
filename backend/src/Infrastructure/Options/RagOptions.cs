@@ -14,6 +14,11 @@ public class RagOptions
     public string BaseUrl { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
 
+    /// <summary>Retrieval mode sent with every /v1/query: "dense" or "hybrid" (RAG_QUERY_MODE).</summary>
+    public string QueryMode { get; set; } = "hybrid";
+    /// <summary>Cross-encoder rerank for /v1/query (RAG_QUERY_RERANK). Needs <c>hybrid</c>; adds a lot of latency.</summary>
+    public bool QueryRerank { get; set; }
+
     // Final values are decided from measured p95 at the end of Sprint 4 (plan section 0); all configurable.
     public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(45);
     public TimeSpan StatusTimeout { get; set; } = TimeSpan.FromSeconds(5);

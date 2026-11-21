@@ -9,6 +9,7 @@ using Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests.Chat;
@@ -187,7 +188,7 @@ public class ChatEndpointTests(ApiFactory factory)
     // ---------- asking ----------
 
     [Fact]
-    public async Task Ask_Calls_RAG_Once_With_The_Active_Index_And_Baseline_Options()
+    public async Task Ask_Calls_RAG_Once_With_The_Active_Index_And_Configured_Default_Options()
     {
         var rag = new RecordingRagClient();
         using var app = WithRag(rag);
@@ -199,9 +200,35 @@ public class ChatEndpointTests(ApiFactory factory)
         var query = Assert.Single(rag.Queries);
         Assert.Equal(Question, query.Question); // trimmed
         Assert.Equal(ChatRules.DefaultTopK, query.TopK);
-        Assert.Equal("dense", query.Options.Mode);
-        Assert.False(query.Options.Rerank);
+        Assert.Equal("hybrid", query.Options.Mode);   // RAG_QUERY_MODE default
+        Assert.False(query.Options.Rerank);            // RAG_QUERY_RERANK default
+        Assert.False(query.Options.Debug);
         Assert.StartsWith("idx-", query.IndexId);
+    }
+
+    [Theory]
+    [InlineData("dense", "false", "dense", false)]
+    [InlineData("HYBRID", "true", "hybrid", true)]
+    public async Task Ask_Passes_The_Configured_Query_Mode_And_Rerank_To_RAG(string mode, string rerank, string expectedMode, bool expectedRerank)
+    {
+        var rag = new RecordingRagClient();
+        using var app = factory.WithWebHostBuilder(b =>
+        {
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RAG_QUERY_MODE"] = mode,
+                ["RAG_QUERY_RERANK"] = rerank,
+            }));
+            b.ConfigureTestServices(s => s.AddSingleton<IRagClient>(rag));
+        });
+        var s = await SetupAsync(app, rag);
+
+        var response = await AskAsync(s.Client, s.ConversationId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var query = Assert.Single(rag.Queries);
+        Assert.Equal(expectedMode, query.Options.Mode);
+        Assert.Equal(expectedRerank, query.Options.Rerank);
     }
 
     [Fact]
