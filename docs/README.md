@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Thư mục này chứa các báo cáo tiến độ của backend `codebase-rag-web`. Plan gốc nằm ngoài repo (`BACKEND_PLAN.md`); các báo cáo ghi lại cái gì đã làm so với plan đó.
+Thư mục này chứa các báo cáo tiến độ và kiểm thử của backend `codebase-rag-web`. Plan gốc nằm ngoài repo (`BACKEND_PLAN.md`); các báo cáo ghi lại cái gì đã làm so với plan đó.
 
 ## Báo cáo
 
@@ -8,6 +8,7 @@ Mới nhất ở trên cùng.
 
 | Ngày | Báo cáo | Phạm vi |
 | --- | --- | --- |
+| 2026-11-21 | [E2E với RAG thật chạy local](reports/e2e-local-2026-11-21.md) | Chat, citation, lịch sử, lỗi, cách ly user; đo latency và chốt timeout 65s |
 | 2026-11-06 | [Tiến độ đến Phase E](reports/2026-11-06-progress-phase-a-e.md) | Phase A đến E |
 
 ## Cách thêm báo cáo mới
