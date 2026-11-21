@@ -144,6 +144,22 @@ public class HttpRagClientTests
         Assert.False(root.GetProperty("debug").GetBoolean());
     }
 
+    [Theory]
+    [InlineData("hybrid", false)]
+    [InlineData("dense", false)]
+    [InlineData("hybrid", true)]
+    public async Task Query_Sends_The_Given_Mode_And_Rerank_In_Options(string mode, bool rerank)
+    {
+        var handler = new StubHandler().Respond(HttpStatusCode.OK, """{"answer":"a","citations":[],"usage":null,"latency_ms":1}""");
+
+        await CreateClient(handler).QueryAsync("idx-1", Question, 5, new RagQueryOptions(mode, rerank));
+
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        var options = body.RootElement.GetProperty("options");
+        Assert.Equal(mode, options.GetProperty("mode").GetString());
+        Assert.Equal(rerank, options.GetProperty("rerank").GetBoolean());
+    }
+
     [Fact]
     public async Task GetFile_Escapes_Path_And_Parses_Response()
     {

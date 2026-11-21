@@ -18,6 +18,7 @@ namespace Application.Chat;
 public partial class ChatService(
     IAppDbContext db,
     IRagClient rag,
+    RagQueryOptions queryOptions,
     RepositoryService repositories,
     IValidator<CreateConversationRequest> createValidator,
     IValidator<UpdateConversationRequest> renameValidator,
@@ -122,7 +123,7 @@ public partial class ChatService(
         RagAnswer answer;
         try
         {
-            answer = await rag.QueryAsync(repo.IndexId!, question, topK, ct: ct);
+            answer = await rag.QueryAsync(repo.IndexId!, question, topK, queryOptions, ct);
         }
         catch (RagException ex) when (IsRecordedFailure(ex.Kind))
         {

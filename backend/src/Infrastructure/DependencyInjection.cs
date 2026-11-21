@@ -88,6 +88,9 @@ public static class DependencyInjection
                 if (Enum.TryParse<RagMode>(c["RAG_MODE"], ignoreCase: true, out var mode)) o.Mode = mode;
                 o.BaseUrl = c["RAG_BASE_URL"] ?? "";
                 o.ApiKey = c["RAG_API_KEY"] ?? "";
+                // Bad values are left at the default here and rejected at startup by RagQueryOptionsValidator.
+                if (!string.IsNullOrWhiteSpace(c["RAG_QUERY_MODE"])) o.QueryMode = c["RAG_QUERY_MODE"]!.Trim().ToLowerInvariant();
+                if (bool.TryParse(c["RAG_QUERY_RERANK"], out var rerank)) o.QueryRerank = rerank;
                 o.QueryTimeout = Seconds(c["RAG_QUERY_TIMEOUT_SECONDS"], o.QueryTimeout);
                 o.StatusTimeout = Seconds(c["RAG_STATUS_TIMEOUT_SECONDS"], o.StatusTimeout);
                 o.RequestTimeout = Seconds(c["RAG_REQUEST_TIMEOUT_SECONDS"], o.RequestTimeout);
@@ -99,6 +102,14 @@ public static class DependencyInjection
             .Validate(o => o.Mode == RagMode.Fake || !string.IsNullOrWhiteSpace(o.ApiKey),
                 "RAG_API_KEY is required (or set RAG_MODE=fake).")
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<RagOptions>, RagQueryOptionsValidator>();
+
+        // The query knobs ChatService sends to RAG: Application only sees this record, not RagOptions.
+        services.AddSingleton(sp =>
+        {
+            var o = sp.GetRequiredService<IOptions<RagOptions>>().Value;
+            return new RagQueryOptions(o.QueryMode, o.QueryRerank);
+        });
 
         services.AddHttpContextAccessor();
         services.AddHttpClient<HttpRagClient>((sp, client) =>
