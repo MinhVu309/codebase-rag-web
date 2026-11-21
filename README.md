@@ -104,8 +104,9 @@ Phần này là những gì frontend cần biết để nối với backend hi�
 
 ### Kết nối và xác thực
 
-- Mọi API nằm dưới `/api`. Production sẽ chạy cùng một origin (nginx phục vụ React và proxy `/api` sang backend), nên backend **không bật CORS**.
-- Khi chạy dev server riêng (Vite hoặc tương tự), hãy cấu hình proxy `/api` sang `http://localhost:8080` để trình duyệt thấy cùng origin và gửi được cookie.
+- Mọi API nằm dưới `/api`. Production sẽ chạy cùng một origin (nginx phục vụ React và proxy `/api` sang backend), nên backend mặc định **không bật CORS**.
+- **Khi chạy dev server riêng (Vite hoặc tương tự), cách khuyến nghị là proxy:** cấu hình proxy `/api` sang `http://localhost:8080` để trình duyệt thấy cùng origin và gửi cookie như production. Ví dụ Vite: `server: { proxy: { '/api': 'http://localhost:8080' } }`. Với cách này không cần CORS và `fetch` không cần `credentials`.
+- **CORS là phương án dự phòng** (khi không dùng được proxy): đặt `CORS_ORIGINS=http://localhost:5173` (đúng origin của dev server, có thể nhiều origin cách nhau bằng dấu phẩy, không dùng `*`) trong `.env` của backend rồi chạy lại `api`. Khi đó backend cho phép đúng origin đó, có credentials, các method GET/POST/PUT/PATCH/DELETE và header `Content-Type`, `X-Request-ID`. Frontend phải gọi `fetch(url, { credentials: 'include' })`. Cookie là `SameSite=Strict` nên chỉ hoạt động khi dev server và API cùng *site* (cùng host, khác cổng thì được: `localhost:5173` gọi `localhost:8080`; `127.0.0.1` gọi `localhost` thì không).
 - Đăng nhập bằng cookie HttpOnly, SameSite=Strict: `access_token` (hết hạn sau 15 phút) và `refresh_token` (7 ngày). Frontend không đọc được token và không cần lưu gì.
 - Chạy local qua http thì giữ `AUTH_COOKIE_SECURE=false` trong `.env` (đã là mặc định của `.env.example`). Khi deploy có TLS phải là `true`.
 - Khi một API trả 401 vì access token hết hạn: gọi `POST /api/auth/refresh`, nếu thành công thì thử lại request đó một lần. Nếu refresh cũng trả 401 thì chuyển về trang đăng nhập.
@@ -165,12 +166,33 @@ Mọi lỗi là ProblemDetails (JSON). Lỗi validate (400) có thêm `errors` t
 | `LLM_ERROR` | 502 | Hệ thống AI lỗi tạm thời, cho thử lại |
 | `RAG_UNAVAILABLE` | 502 | Không kết nối được hệ thống AI |
 | `TIMEOUT` | 504 | Hệ thống AI trả lời quá hạn, cho thử lại |
+| `RATE_LIMITED` | 429 | Gửi quá nhanh. Đọc header `Retry-After` (giây) rồi cho thử lại, đừng thử lại ngay |
+| `IMPORT_IN_PROGRESS` | 409 | Người dùng đang có repository khác đang index (mặc định 1 cái một lúc). Chờ nó `ready` hoặc `failed` rồi import tiếp |
+| `REQUEST_TOO_LARGE` | 413 | Body quá 64 KB (mặc định) |
 | `FILE_NOT_FOUND` | 404 | File không còn trong bản đã index (code viewer): hiển thị snippet đã lưu trong citation kèm nhãn "phiên bản cũ" |
 | `INDEX_NOT_FOUND` | 404 | RAG không còn chỉ mục của repository (code viewer) |
 | `INVALID_RANGE` | 400 | Khoảng dòng sai: `start` < 1, `end` < `start`, hoặc quá 2000 dòng (code viewer) |
 | `REPOSITORY_FAILED` | 409 | (cũng dùng cho code viewer) repository đã index thất bại |
 
-Timeout từ frontend tới backend nên đặt 60 giây.
+Timeout từ frontend tới backend: **75 giây cho `POST /api/conversations/{id}/messages`** (backend chờ RAG tối đa 65 giây) và 60 giây cho các API còn lại.
+
+### Giới hạn tốc độ và kích thước
+
+Giá trị mặc định (đổi bằng biến môi trường, xem `.env.example`; đặt 0 để tắt từng giới hạn):
+
+| Giới hạn | Mặc định | Áp dụng cho |
+| --- | --- | --- |
+| Đăng ký, đăng nhập, refresh | 10 lần/phút | mỗi địa chỉ IP, dùng chung cho cả ba |
+| Gửi câu hỏi | 10 lần/phút | mỗi user |
+| Import repository | 5 lần/10 phút | mỗi user |
+| Repository đang index cùng lúc | 1 | mỗi user (qua mọi project) |
+| Kích thước body | 64 KB | mọi request |
+
+Vượt giới hạn tốc độ: `429` kèm `code: "RATE_LIMITED"` và header `Retry-After`. Hiển thị "Bạn thao tác quá nhanh, thử lại sau N giây" và khoá nút gửi trong N giây. Nếu nhiều người dùng chung một IP (lớp học, văn phòng) và gặp giới hạn đăng nhập, tăng `RATE_LIMIT_AUTH_PER_MINUTE`.
+
+**Chạy sau nginx:** đặt `TRUSTED_PROXIES` là địa chỉ hoặc dải mạng của nginx (ví dụ `172.18.0.0/16` trong mạng compose), nginx phải gửi `X-Forwarded-For`. Không đặt thì backend bỏ qua header đó và coi mọi client là địa chỉ của nginx, làm giới hạn theo IP áp lên tất cả người dùng cùng lúc.
+
+Mọi response có `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` và `Cache-Control: no-store`. `Strict-Transport-Security` do nginx đặt (TLS kết thúc ở đó).
 
 ### Code viewer
 
