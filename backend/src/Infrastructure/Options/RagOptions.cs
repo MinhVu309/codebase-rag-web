@@ -19,8 +19,8 @@ public class RagOptions
     /// <summary>Cross-encoder rerank for /v1/query (RAG_QUERY_RERANK). Needs <c>hybrid</c>; adds a lot of latency.</summary>
     public bool QueryRerank { get; set; }
 
-    // Final values are decided from measured p95 at the end of Sprint 4 (plan section 0); all configurable.
-    public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(45);
+    // Query timeout 65s is derived from the local E2E measurement (docs/reports/e2e-local-2026-11-21.md); all configurable.
+    public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(65);
     public TimeSpan StatusTimeout { get; set; } = TimeSpan.FromSeconds(5);
     /// <summary>Create index, files, delete, health.</summary>
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);

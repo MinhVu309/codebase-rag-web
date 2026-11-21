@@ -87,7 +87,7 @@ RAG_QUERY_RERANK=false                           # true chỉ hợp lệ khi mod
 ```
 
 - `RAG_QUERY_MODE` (mặc định `hybrid`) và `RAG_QUERY_RERANK` (mặc định `false`) được gửi trong `options` của mọi `POST /v1/query`. Giá trị sai (`hybird`, `RAG_QUERY_RERANK=yes`, `rerank=true` với `dense`) làm API không khởi động. Rerank nạp cross-encoder và chậm đáng kể nên chỉ bật khi có quyết định riêng.
-- `RAG_QUERY_TIMEOUT_SECONDS`: RAG đặt `LLM_TIMEOUT_MS=60000`, lớn hơn mặc định 45s của web, nên khi thử với RAG thật tạm đặt 70. Đây là giá trị tạm; chốt lại theo P95 đo được (khoảng 2 lần P95).
+- `RAG_QUERY_TIMEOUT_SECONDS` (mặc định **65**): RAG đặt `LLM_TIMEOUT_MS=60000`, nên web phải chờ lâu hơn mức đó, nếu không sẽ tự ngắt trước khi RAG kịp trả 504 `TIMEOUT`. Giá trị là max(2 lần P95, `LLM_TIMEOUT_MS` + 5s); đo 18 câu thật trên model free cho P95 khoảng 25 đến 32 giây (xem [báo cáo E2E](docs/reports/e2e-local-2026-11-21.md)). Frontend phải đặt timeout gọi `POST .../messages` lớn hơn 65s (khuyến nghị 75s); mức 60s ghi trong kế hoạch cũ là không đủ. Đo lại khi đổi model hoặc bật rerank.
 - Từ container không gọi được `host.docker.internal:8000` thì chạy RAG với `--host 0.0.0.0` (chỉ làm khi cần, vì khi đó máy khác trong mạng cũng gọi được cổng 8000, tuy vẫn bị chặn bởi `X-API-Key`).
 - Mỗi người dùng RAG cục bộ riêng: dữ liệu index nằm ở `storage/` của máy chạy RAG, không chia sẻ.
 
@@ -136,7 +136,9 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 
 Cần gì thêm thì báo để thống nhất trước khi backend làm.
 
-`repoUrl` chỉ nhận đúng dạng `https://github.com/<owner>/<repo>`.
+`repoUrl` chỉ nhận đúng dạng `https://github.com/<owner>/<repo>`. Backend chấp nhận thêm đuôi `.git` hoặc một dấu `/` cuối và lưu về dạng chuẩn không có chúng (`.../flask.git` thành `.../flask`).
+
+**Repository đang hoạt động (active):** mỗi project chỉ hỏi được trên **một** repository, là repository **import sau cùng**; `isActive: true` đánh dấu nó. Import thêm repo thứ hai vào cùng project thì chat chuyển sang repo mới, repo cũ vẫn xem được nhưng chưa có API đổi lại. Xoá repo đang active thì repo mới nhất còn lại trở thành active. Muốn hỏi hai repo khác nhau thì tạo hai project.
 
 **Thay đổi so với trước (ảnh hưởng frontend):** `ref` là tuỳ chọn thật sự. Bỏ `ref` thì backend không gửi `ref` cho RAG, RAG dùng nhánh mặc định của repo (`master`, `develop`, ...; trước đây backend tự điền `main` nên repo dùng `master` bị lỗi). Vì vậy trường `ref` trong response của repository (`POST`/`GET /api/repositories/...`, `GET /api/projects/{id}`) **có thể là `null`**. Frontend nên hiển thị "nhánh mặc định" khi `ref` là `null`, đừng giả định luôn có chuỗi. Import cùng URL lần hai với cùng `ref` (kể cả cùng bỏ trống) trả 409; bỏ trống và `main` tường minh được tính là hai lần import khác nhau.
 
