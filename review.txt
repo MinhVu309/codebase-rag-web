@@ -1,0 +1,359 @@
+================================================================================
+           BÁO CÁO ĐÁNH GIÁ TOÀN DIỆN HỆ THỐNG FRONTEND (CODEINSIGHT)
+               DỰA TRÊN NỀN TẢNG BACKEND ASP.NET CORE CÓ SẴN
+================================================================================
+Thời gian xuất báo cáo: 2026-11-24
+Dự án: Codebase RAG Web (CodeInsight)
+Môi trường: Frontend (React 18, Vite, TypeScript) - Backend (.NET 9.0 Web API, PostgreSQL)
+================================================================================
+
+PHẦN I: ĐÁNH GIÁ HIỆN TRẠNG FRONTEND ĐÃ XÂY DỰNG
+--------------------------------------------------------------------------------
+
+1. TỔNG QUAN BỐI CẢNH & MỤC TIÊU (CONTEXT & OBJECTIVES)
+- Nền tảng Backend gốc khi pull repository:
+  + Backend được xây dựng bằng .NET 9.0 Web API theo cấu trúc Clean Architecture / RESTful.
+  + Cơ sở dữ liệu: PostgreSQL chạy qua Docker Compose.
+  + Các API Controllers cốt lõi:
+    * AuthController: Đăng ký, đăng nhập tài khoản và cấp phát JWT Bearer Token.
+    * ProjectsController: Quản lý vòng đời dự án (tạo, liệt kê danh sách, đổi tên, xóa dự án).
+    * RepositoriesController: Tiếp nhận URL repository GitHub, kích hoạt background worker clone mã nguồn, phân tích cú pháp AST và tính toán embedding vectors.
+    * ConversationsController: Quản lý phiên chat, gửi câu hỏi tới AI RAG engine (sử dụng FakeRagClient trả về kết quả giả định kèm trích dẫn file và dòng code), lưu lịch sử tin nhắn.
+    * HealthController: Kiểm tra liveness và readiness của hệ thống (/health).
+
+- Mục tiêu đặt ra cho Frontend:
+  + Xây dựng một Single Page Application (SPA) hoàn chỉnh, hiện đại dành cho lập trình viên (Developer Tooling cao cấp), lấy cảm hứng từ Linear, GitHub Codespaces và v0.
+  + Đồng bộ và ăn khớp 100% với các DTOs và API endpoints của Backend mà không cần can thiệp chỉnh sửa Backend.
+  + Tối ưu trải nghiệm người dùng (UX): tốc độ phản hồi tức thì, không giật lag, hỗ trợ cả 2 chế độ Light Mode và Dark Mode đạt chuẩn trợ năng WCAG AA (tương phản >= 4.5:1), cùng các hiệu ứng vi tương tác (micro-interactions) tinh tế.
+
+
+2. KIẾN TRÚC CÔNG NGHỆ FRONTEND (FRONTEND ARCHITECTURE & TECH STACK)
+- Core Framework: React 18 kết hợp TypeScript (Strict Type Checking). Toàn bộ interface dữ liệu (ProjectDto, RepositoryDto, MessageDto, CitationDto...) khớp chuẩn xác với DTO Backend.
+- Build Tool: Vite 8 + Rolldown, cho thời gian khởi động môi trường dev dưới 100ms và build production chỉ mất ~3.3 giây.
+- Quản lý trạng thái (State Management):
+  + Server State: TanStack React Query v5. Quản lý bộ nhớ đệm (caching), tự động hủy và làm mới truy vấn (query invalidation), xử lý polling ngầm kiểm tra trạng thái clone/index repository.
+  + Global Client State: Zustand với các stores độc lập:
+    * authStore: Quản lý token xác thực, thông tin user, tự động gắn Header Authorization Bearer vào Axios interceptor.
+    * themeStore: Quản lý chuyển đổi chế độ giao diện Sáng / Tối (Light / Dark mode).
+    * uiStore: Quản lý trạng thái đóng/mở thanh điều hướng Sidebar trên thiết bị di động.
+    * notificationStore: Quản lý thông báo theo thời gian thực, lưu trữ cục bộ (localStorage), điều phối banner bay ra từ chuông và trạng thái chấm đỏ chưa đọc.
+- Hệ thống giao diện (Design System):
+  + Tailwind CSS v3 kết hợp kiến trúc biến màu CSS (CSS Custom Variables) theo hệ chuẩn GitHub Primer.
+  + Sử dụng các bề mặt màu đặc (Solid Surfaces) thay vì kính mờ loang lổ (Glassmorphism), viền 1px sắc nét giúp giao diện không bị chìm ở nền sáng và không bị lóa ở nền tối.
+- Gói biểu tượng & Hoạt ảnh: Lucide Icons kết hợp bộ hoạt ảnh tùy biến từ Lucian Lab Prompts (#440 và #074).
+
+
+3. CHI TIẾT ĐÁNH GIÁ CÁC PHÂN HỆ CHỨC NĂNG (FEATURE BREAKDOWN)
+3.1. Trang Tổng quan Dự án (Dashboard - DashboardPage.tsx)
+- Thanh số liệu nhanh (Quick Metrics Bar):
+  + Hiển thị trực quan 3 chỉ số quan trọng theo thời gian thực: Tổng số dự án (Total Projects), Số repository đã kết nối, và Số workspace đã được nhúng vector sẵn sàng.
+- Thanh điều khiển tương tác đa năng (Controls Bar):
+  + Tìm kiếm dự án tức thời theo tên, repository hoặc tag.
+  + Dropdown bộ lọc trạng thái: Tất cả dự án (All Projects), Dự án đang hoạt động (Active), Dự án chưa có repo (Empty).
+  + Dropdown sắp xếp: Cập nhật gần nhất (Last Updated), Ngày tạo (Created Date), Tên A-Z (Name).
+  + Nút chuyển đổi nhanh chế độ hiển thị giữa Grid View (dạng thẻ lưới) và List View (dạng danh sách chi tiết).
+- Quy trình Tạo Dự án Mới (Lucian #440 Integration):
+  + Tích hợp modal tạo dự án với hoạt ảnh pháo hoa hạt vi mô (confetti burst) đẹp mắt.
+  + Đã khắc phục triệt để lỗi chuyển trang cưỡng bức (force redirect): Dự án vừa tạo lập tức được cập nhật và hiển thị ngay trên Dashboard, người dùng toàn quyền quyết định khi nào mở dự án.
+
+3.2. Quản lý Repository & Quy trình Indexing (ProjectDetailPage.tsx)
+- Smart Repo Input: Hỗ trợ nhập URL repository GitHub kèm nhánh cần lập chỉ mục (main, master, dev...).
+- Cơ chế Polling tự động:
+  + Khi repository ở trạng thái "pending" hoặc "indexing", Frontend kích hoạt polling ngầm định kỳ mỗi 2 giây để kiểm tra trạng thái từ Backend.
+  + Pipeline Stepper trực quan hiển thị từng bước: Clone Repository -> AST Syntax Tree Parsing -> Vector Embeddings Generation -> Ready for AI Chat.
+  + Khi index hoàn tất, giao diện tự động làm mới và thông báo đến người dùng mà không cần tải lại trang (F5).
+
+3.3. AI Codebase Chat & Trích dẫn Nguồn RAG (ChatPage.tsx)
+- Trải nghiệm trò chuyện AI tối ưu cho lập trình viên:
+  + Thanh bên quản lý danh sách các cuộc trò chuyện theo từng dự án.
+  + Hộp nhập câu hỏi hỗ trợ phím tắt Enter (gửi) và Shift+Enter (xuống dòng).
+  + Hiệu ứng sóng não AI (AiThinkingIndicator) hiển thị trong thời gian chờ mô hình suy luận.
+- Tương thích vững chắc với FakeRagClient của Backend:
+  + Backend trả về dữ liệu hội thoại kèm mảng trích dẫn dưới định dạng { userMessage, assistantMessage }. Frontend đã xử lý an toàn tránh lỗi crash trang khi cấu trúc DTO thay đổi.
+- Ngăn trích dẫn nguồn chi tiết (Citations Drawer):
+  + Từng phản hồi AI đều đính kèm badge trích dẫn (ví dụ: [1] Program.cs :1-3).
+  + Khi bấm vào badge, ngăn Citation Drawer mở ra hiển thị tên tệp, đường dẫn và đoạn mã nguồn tương ứng, kèm liên kết chuyển nhanh sang Code Explorer.
+
+3.4. Hệ thống Chuông Thông báo Tương tác Cao (LucianNotificationPopover.tsx)
+- Chuông thông báo chuẩn kích thước 34x34px, bo góc 8px, viền 1px sắc nét trên thanh Header.
+- Thay thế Toast thông thường bằng hiệu ứng Flyout từ chuông:
+  + Khi tạo dự án mới hoặc import repository thành công, thông báo không hiển thị góc phải trên màn hình mà phát ra trực tiếp từ chiếc chuông (pop-out với hoạt ảnh rung chuông u074-ring).
+  + Thông báo hiển thị trong khoảng 3.6 giây rồi tự động thu gọn và biến mất trở lại vào bên trong chiếc chuông.
+- Dấu chấm đỏ thông minh (Unread Indicator):
+  + Hiển thị chấm đỏ tươi (#ef4444) ở góc chuông khi có thông báo mới chưa đọc.
+  + Tự động biến mất hoàn toàn khi người dùng đã đọc hết thông báo hoặc nhấn nút "Đánh dấu đã đọc".
+- Nút xóa "x" trên từng thông báo:
+  + Cho phép người dùng xóa nhanh các thông báo cũ trực tiếp trên từng hàng mà không ảnh hưởng tới các thông báo khác.
+
+3.5. Hệ thống Màu sắc & Chế độ Sáng / Tối (Design System)
+- Khắc phục triệt để lỗi chuyển đổi không gian màu (hsl vs rgb):
+  + Toàn bộ biến màu trong index.css được khai báo dưới dạng bộ ba số RGB (255 255 255, 13 17 23).
+  + Đã chuẩn hóa toàn bộ component về rgb(var(--...)), loại bỏ hoàn toàn hiện tượng nền popover bị biến thành màu nâu cam chói mắt ở Dark Mode.
+  + Chế độ Sáng (Light Mode): Nền canvas xám nhẹ (#f6f8fa), viền xám GitHub (#d0d7de), chữ đen than chì (#1f2328), chiếc chuông và các nút điều khiển có viền rõ ràng, không bị chìm vào nền trắng.
+  + Chế độ Tối (Dark Mode): Nền tối sâu GitHub (#0d1117, #161b22), chữ trắng xám (#e6edf3), độ tương phản cao, êm mắt khi làm việc lâu.
+
+
+4. CÁC ĐIỂM MẠNH NỔI BẬT (KEY STRENGTHS & HIGHLIGHTS)
+1. Tương thích hoàn hảo với Backend có sẵn:
+   - Toàn bộ kết nối API từ xác thực, quản lý dự án, import repo đến chat RAG đều hoạt động ổn định mà không cần sửa đổi bất kỳ dòng mã nguồn nào của Backend C#.
+2. Xử lý lỗi toàn diện (Robust Error Handling):
+   - Tự động bóc tách mã lỗi và cấu trúc ProblemDetails từ ASP.NET Core để hiển thị thông báo lỗi bằng tiếng Việt rõ ràng, thân thiện với người dùng.
+3. Độ trễ hiển thị bằng 0 (Zero Latency Perceived):
+   - Ứng dụng kỹ thuật Cache Invalidation của TanStack Query giúp dữ liệu trên màn hình cập nhật ngay lập tức khi thực hiện các tác vụ tạo/sửa/xóa.
+4. Trải nghiệm người dùng và Thẩm mỹ cao:
+   - Giao diện đạt độ hoàn thiện cao, các chi tiết chuyển động mượt mà, layout đáp ứng tốt trên cả máy tính lẫn thiết bị di động.
+
+
+================================================================================
+PHẦN II: ĐỀ XUẤT THIẾT KẾ & TRIỂN KHAI FRONTEND (D40 SPECIFICATION)
+================================================================================
+
+1. CONVERSATION SCOPE: QUẢN LÝ REPOSITORY TRONG SCOPE CỦA TỪNG CONVERSATION
+--------------------------------------------------------------------------------
+Bản chất: Scope là BIÊN CỨNG (hard boundary). AI RAG chỉ được phép tìm kiếm trong
+các repository nằm trong Scope của cuộc trò chuyện này.
+
+* Wireframe Giao diện trên Chat Header:
++----------------------------------------------------------------------------------------------------+
+| Chat / testproject / "Tìm hiểu kiến trúc xác thực"                                                 |
+| [+] Scope: 2 Repos [auth-service] [ledger-api]  [+ Thêm/Bớt Repo]   | Top-K: [8 v] | [Explorer]    |
++----------------------------------------------------------------------------------------------------+
+
+* Wireframe Modal Quản lý Scope (khi bấm [+ Thêm/Bớt Repo]):
++------------------------ Quản lý Scope của Conversation ------------------------+
+| Chọn các repository mà AI có quyền truy vấn trong cuộc trò chuyện này:         |
+|                                                                                |
+| [X] auth-service       (READY - 124 files, main)         [In Scope]            |
+| [X] ledger-api         (READY - 89 files, main)          [In Scope]            |
+| [ ] payment-gateway    (READY - 45 files, main)          [Bấm để thêm]         |
+| [!] frontend-nextjs    (INDEXING - Đang lập chỉ mục...)  [Không khả dụng]      |
+|                                                                                |
+| (i) Chỉ các repo có trạng thái READY mới có thể đưa vào Scope.                 |
+|                                                    [Hủy]  [Lưu thay đổi Scope] |
++--------------------------------------------------------------------------------+
+
+* Luồng tương tác:
+  - Chỉ repository có status == 'ready' mới được tick chọn.
+  - Khi lưu, FE gửi request cập nhật Scope của Conversation lên Backend.
+  - Các tin nhắn cũ trong quá khứ KHÔNG bị ảnh hưởng (giữ nguyên snapshot lúc hỏi).
+
+
+2. REPOSITORY FOCUS: ƯU TIÊN MỀM CHO TỪNG CÂU HỎI (PER-TURN SOFT PRIORITY)
+--------------------------------------------------------------------------------
+Bản chất: Focus là ƯU TIÊN MỀM (soft priority), KHÔNG PHẢI bộ lọc cứng. RAG sẽ tìm
+kiếm và chấm điểm (re-rank) tập trung vào các repo Focus trước; nếu không đủ bằng
+chứng, RAG sẽ tự động mở rộng sang các repo còn lại trong Scope.
+
+* Wireframe Giao diện Selector Bar đặt ngay trên Chat Input:
++----------------------------------------------------------------------------------------------------+
+| (i) Scope hiện tại: auth-service, ledger-api                                                       |
+| Ưu tiên (Focus): [★ Tất cả trong Scope]  [★ auth-service]  [☆ ledger-api]   [ℹ️ Ưu tiên mềm]       |
+| +------------------------------------------------------------------------------------------------+ |
+| | Hãy giải thích luồng xử lý refresh token và phân quyền JWT...                                  | |
+| |                                                                                     [ Send ^ ] | |
+| +------------------------------------------------------------------------------------------------+ |
++----------------------------------------------------------------------------------------------------+
+
+* Cơ chế hiển thị & Tương tác:
+  - Hiển thị dưới dạng Filter Chips / Pills tương tác nhanh:
+    + [★ auth-service]: Đang chọn làm Focus (viền tím Indigo, icon ngôi sao đặc).
+    + [☆ ledger-api]: Nằm trong Scope nhưng không đặt Focus (viền xám nhạt).
+    + [★ Tất cả trong Scope]: Tùy chọn mặc định.
+  - Hỗ trợ đa chọn (Multi-select): Cho phép tick 1 hoặc nhiều repo Focus cùng lúc.
+  - Tooltip giải thích bản chất: Khi hover vào [ℹ️ Ưu tiên mềm]:
+    "Focus sẽ ưu tiên tìm kiếm và trích dẫn mã nguồn trong các repo được đánh dấu trước.
+     Nếu không tìm thấy đủ bằng chứng, hệ thống sẽ tự động tìm thêm trong các repo khác thuộc Scope."
+
+
+3. FALLBACK: THÔNG BÁO VÀ HIỂN THỊ NGUỒN KHI MỞ RỘNG NGOÀI FOCUS
+--------------------------------------------------------------------------------
+Khi người dùng đặt Focus vào [auth-service], nhưng câu hỏi cần thêm thông tin và RAG
+phải lấy thêm mã nguồn từ [ledger-api] (nằm trong Scope nhưng ngoài Focus):
+
+* Wireframe Giao diện Tin nhắn Assistant kèm Fallback Notice:
++----------------------------------------------------------------------------------------------------+
+| [AI CodeInsight]  •  16:45  •  185ms  •  [Status: Answered]                                        |
+|                                                                                                    |
+| Luồng refresh token được xác thực tại AuthService, sau đó thông tin số dư tài khoản                |
+| được đồng bộ qua LedgerClient [1] và lưu vào bảng LedgerTransactions [2].                          |
+|                                                                                                    |
+| ⚡ [Thông tin mở rộng từ Scope]                                                                    |
+| "Không tìm thấy đủ ngữ cảnh trong Focus [auth-service]. RAG đã tự động bổ sung bằng chứng         |
+|  từ [ledger-api] (thuộc Scope) để câu trả lời hoàn thiện nhất."                                    |
+|                                                                                                    |
+| CITATIONS (2)                                                                  [Open Explorer]     |
+|  ★ Focus:                                                                                          |
+|    [1] auth-service : TokenService.cs :45-62                                                       |
+|  ↳ Mở rộng từ Scope:                                                                               |
+|    [2] ledger-api : LedgerClient.cs :12-28   [External Scope]                                      |
+|                                                                                                    |
+| [Copy]  [👍] [👎]                                                                                  |
++----------------------------------------------------------------------------------------------------+
+
+* Chi tiết hiển thị:
+  - Callout Banner màu xanh dịu/hổ phách nhạt giải thích rõ việc mở rộng tìm kiếm.
+  - Phân nhóm Citation: Tách biệt rõ danh sách trích dẫn từ "★ Focus" và "↳ Mở rộng từ Scope" kèm badge [External Scope].
+
+
+4. QUERY STATUS: THIẾT KẾ 5 TRẠNG THÁI TRUY VẤN CHUẨN D40
+--------------------------------------------------------------------------------
+Mỗi tin nhắn trả lời của Assistant sẽ có một Status Badge rõ ràng tại thanh tiêu đề:
+
+| Query Status     | Badge Icon & Màu sắc        | Hành vi & Nội dung hiển thị trên Frontend                    |
+|------------------|-----------------------------|--------------------------------------------------------------|
+| Answered         | [● Answered] (Xanh lục)     | Hiển thị trọn vẹn câu trả lời và danh sách trích dẫn (citations)|
+| No Evidence      | [○ No Evidence] (Hổ phách)  | Banner: "Không tìm thấy bằng chứng phù hợp trong Scope hiện tại. |
+|                  |                             | Bạn có thể mở rộng Scope hoặc đổi từ khóa." + [Mở rộng Scope]|
+| Partial Result   | [◐ Partial] (Xanh dương)    | Cảnh báo: "Kết quả chỉ phản ánh một phần codebase do repo     |
+|                  |                             | [ledger-api] phản hồi chậm hoặc thiếu context."               |
+| Failed           | [✕ Failed] (Đỏ)             | Lỗi hệ thống/model crash + nút [Thử lại câu hỏi (Retry)]     |
+|                  |                             | + Xem chi tiết mã lỗi kỹ thuật (collapsible error stack).    |
+| Unavailable      | [⊘ Unavailable] (Xám bạc)   | "Không thể thực hiện truy vấn vì repo [payment-gateway]      |
+|                  |                             | đang trong trạng thái INDEXING. Vui lòng đợi hoặc xóa khỏi Scope."|
+
+
+5. REPOSITORY MỚI: GỢI Ý THÊM VÀO SCOPE KHI CHUYỂN SANG READY
+--------------------------------------------------------------------------------
+Khi người dùng import repository mới và background worker vừa index xong (chuyển sang READY):
+
+* Wireframe Contextual Banner hiển thị ngay trong trang Chat:
++----------------------------------------------------------------------------------------------------+
+|  🎉 [Repository Mới Sẵn Sàng]                                                                      |
+|  Repository "payment-gateway" vừa được lập chỉ mục thành công (READY).                             |
+|  Bạn có muốn thêm vào Scope của cuộc trò chuyện này để đặt câu hỏi liên quan?                      |
+|                                                                                                    |
+|  [+ Thêm vào Scope ngay]               [Để sau / Bỏ qua]                                           |
++----------------------------------------------------------------------------------------------------+
+
+* Cơ chế phối hợp:
+  - Hệ thống notificationStore kích hoạt chuông rung lắc và phát flyout banner trên Header.
+  - Đồng thời trong Conversation hiện tại xuất hiện ScopeRecommendationBanner phía trên ô chat.
+  - Khi bấm [+ Thêm vào Scope ngay], FE gọi API thêm repo vào scope, chip repo mới lập tức xuất hiện
+    trên thanh Focus bar và banner tự động đóng lại.
+
+
+6. HISTORY IMMUTABILITY: BẢO ĐẢM LỊCH SỬ CŨ KHÔNG THAY ĐỔI
+--------------------------------------------------------------------------------
+Nguyên tắc kiến trúc: Mỗi lượt hỏi đáp (turn) là một bản ghi lịch sử bất biến (Immutable Record).
+
+* Wireframe Thông tin Lịch sử đính kèm từng Tin nhắn:
++----------------------------------------------------------------------------------------------------+
+| [User]                                                                               15:30 • Hôm qua |
+| Kiểm tra cách tính thuế VAT trong giao dịch thanh toán?                                            |
+| 🏷️ Context lúc hỏi: Scope: [ledger-api] • Focus: [ledger-api]                                      |
++----------------------------------------------------------------------------------------------------+
+| [AI CodeInsight]                                                                     15:30 • 120ms  |
+| Thuế VAT được tính theo công thức tại TaxCalculator.cs [1]...                                       |
+|                                                                                                    |
+| 🔍 Đã tra cứu thực tế: ledger-api (hit: 4 chunks)                                                  |
+| CITATIONS (1): [1] ledger-api : TaxCalculator.cs :15-25                                            |
++----------------------------------------------------------------------------------------------------+
+
+* Cơ chế kỹ thuật:
+  - Mỗi tin nhắn lưu kèm metadata snapshot gồm:
+    + scopeSnapshot: Danh sách repo nằm trong Scope tại thời điểm gửi.
+    + focusSnapshot: Danh sách repo được chọn làm Focus tại thời điểm gửi.
+    + searchedRepositories: Danh sách repo thực tế mà RAG đã tra cứu.
+  - Khi người dùng chỉnh sửa Scope hiện tại của Conversation (ví dụ xóa ledger-api),
+    các tin nhắn cũ vẫn hiển thị đúng snapshot lịch sử ngày hôm qua, hoàn toàn không bị sai lệch.
+
+
+7. MA TRẬN COMPONENT FRONTEND (REUSE vs MODIFY vs CREATE)
+--------------------------------------------------------------------------------
+- Component Tái sử dụng (Reuse):
+  + Header.tsx: Giữ nguyên header, breadcrumbs, search và theme switcher.
+  + AiThinkingIndicator.tsx: Giữ nguyên hiệu ứng pulse khi đang truy vấn.
+  + LucianNotificationPopover.tsx: Tái sử dụng chuông thông báo, flyout banner và chấm đỏ unread.
+
+- Component Chỉnh sửa (Modify):
+  + ChatPage.tsx: Nhúng Scope Bar trên header chat, Focus bar trên ô input, và lắng nghe repo READY.
+  + MessageItem.tsx: Bổ sung QueryStatusBadge, khối Fallback notice, snapshot Scope/Focus lịch sử, và phân nhóm citation.
+  + CitationDrawer.tsx: Bổ sung tag nhận diện [Focus Repo] vs [Fallback Scope] khi xem chi tiết code.
+
+- Component Tạo mới (Create):
+  + ConversationScopeModal.tsx: Modal/Popover chọn danh sách repository nằm trong Scope.
+  + RepositoryFocusSelector.tsx: Thanh multi-select pill bar chọn repo ưu tiên mềm (Focus).
+  + QueryStatusBadge.tsx: Badge chuẩn hóa 5 trạng thái truy vấn (Answered, No Evidence, Partial, Failed, Unavailable).
+  + ScopeRecommendationBanner.tsx: Banner mềm gợi ý thêm repo mới vào Scope khi repo chuyển READY.
+
+
+8. YÊU CẦU ĐỐI CHIẾU VỚI BACKEND API CONTRACT & DTOs (D40)
+--------------------------------------------------------------------------------
+Để hiện thực hóa trọn vẹn phương án Frontend trên, Backend cần cung cấp các API và trường dữ liệu sau:
+
+8.1. API Quản lý Scope của Conversation:
+- GET /api/projects/{projectId}/conversations/{conversationId}
+  Bổ sung trường:
+  {
+    "id": "conv-123",
+    "projectId": "proj-abc",
+    "title": "Tìm hiểu kiến trúc xác thực",
+    "scopeRepositoryIds": ["repo-auth-id", "repo-ledger-id"]
+  }
+
+- PUT /api/projects/{projectId}/conversations/{conversationId}/scope
+  Request Payload:
+  {
+    "repositoryIds": ["repo-auth-id", "repo-ledger-id", "repo-payment-id"]
+  }
+
+8.2. Payload Gửi Câu hỏi (Ask Request with Focus):
+- POST /api/projects/{projectId}/conversations/{conversationId}/messages
+  Request Payload:
+  {
+    "question": "Kiểm tra cách tính thuế VAT...",
+    "focusRepositoryIds": ["repo-auth-id"],
+    "topK": 8
+  }
+
+8.3. Payload Phản hồi Tin nhắn (MessageDto Response with Metadata):
+  Bổ sung các trường snapshot vào MessageDto của assistantMessage:
+  {
+    "id": "msg-456",
+    "conversationId": "conv-123",
+    "role": "assistant",
+    "content": "Luồng refresh token được xác thực tại AuthService...",
+    "queryStatus": "answered", // "answered" | "no_evidence" | "partial" | "failed" | "unavailable"
+    "fallbackTriggered": true,  // true nếu RAG phải lấy ngoài focus
+    "scopeSnapshot": [
+      { "id": "repo-auth-id", "name": "auth-service" },
+      { "id": "repo-ledger-id", "name": "ledger-api" }
+    ],
+    "focusSnapshot": [
+      { "id": "repo-auth-id", "name": "auth-service" }
+    ],
+    "searchedRepositories": [
+      { "id": "repo-auth-id", "name": "auth-service", "isFocus": true, "hitCount": 1 },
+      { "id": "repo-ledger-id", "name": "ledger-api", "isFocus": false, "hitCount": 1 }
+    ],
+    "citations": [
+      {
+        "refId": 1,
+        "repositoryId": "repo-auth-id",
+        "repositoryName": "auth-service",
+        "filePath": "TokenService.cs",
+        "startLine": 45,
+        "endLine": 62,
+        "isFocus": true
+      },
+      {
+        "refId": 2,
+        "repositoryId": "repo-ledger-id",
+        "repositoryName": "ledger-api",
+        "filePath": "LedgerClient.cs",
+        "startLine": 12,
+        "endLine": 28,
+        "isFocus": false // Thuộc fallback
+      }
+    ],
+    "latencyMs": 185,
+    "createdAt": "2026-11-24T15:30:00Z"
+  }
+
+================================================================================
+                               KẾT LUẬN
+================================================================================
+Báo cáo và Đề xuất trên cung cấp một giải pháp Frontend đồng bộ, tường minh và
+hoàn toàn sẵn sàng để đối chiếu trực tiếp với tài liệu API Contract Proposal
+cũng như Implementation & Test Plan của D40.
+================================================================================

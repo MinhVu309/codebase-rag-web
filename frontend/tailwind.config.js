@@ -1,0 +1,117 @@
+/** @type {import('tailwindcss').Config} */
+function withOpacity(variableName) {
+  return ({ opacityValue }) => {
+    if (opacityValue !== undefined) {
+      return `rgb(var(${variableName}) / ${opacityValue})`;
+    }
+    return `rgb(var(${variableName}))`;
+  };
+}
+
+export default {
+  darkMode: 'class',
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // Semantic Tokens (GitHub Primer + Linear Indigo)
+        'background': withOpacity('--background'),
+        'foreground': withOpacity('--foreground'),
+        'card': withOpacity('--card'),
+        'card-foreground': withOpacity('--card-foreground'),
+        'popover': withOpacity('--popover'),
+        'popover-foreground': withOpacity('--popover-foreground'),
+        'border': withOpacity('--border'),
+        'muted': withOpacity('--muted'),
+        'muted-foreground': withOpacity('--muted-foreground'),
+        'accent': withOpacity('--accent'),
+        'accent-foreground': withOpacity('--accent-foreground'),
+        'destructive': withOpacity('--destructive'),
+        'destructive-foreground': withOpacity('--destructive-foreground'),
+
+        // Material / Stitch Aliases (100% mapped to solid GitHub tokens)
+        'surface': withOpacity('--surface'),
+        'surface-dim': withOpacity('--surface-dim'),
+        'surface-bright': withOpacity('--surface-bright'),
+        'surface-variant': withOpacity('--surface-variant'),
+        'surface-container-lowest': withOpacity('--surface-container-lowest'),
+        'surface-container-low': withOpacity('--surface-container-low'),
+        'surface-container': withOpacity('--surface-container'),
+        'surface-container-high': withOpacity('--surface-container-high'),
+        'surface-container-highest': withOpacity('--surface-container-highest'),
+        'on-surface': withOpacity('--on-surface'),
+        'on-surface-variant': withOpacity('--on-surface-variant'),
+        'inverse-surface': withOpacity('--inverse-surface'),
+        'inverse-on-surface': withOpacity('--inverse-on-surface'),
+        'outline': withOpacity('--outline'),
+        'outline-variant': withOpacity('--outline-variant'),
+        'primary': withOpacity('--primary'),
+        'primary-container': withOpacity('--primary-container'),
+        'primary-fixed': withOpacity('--primary-fixed'),
+        'primary-fixed-dim': withOpacity('--primary-fixed-dim'),
+        'on-primary': withOpacity('--on-primary'),
+        'on-primary-container': withOpacity('--on-primary-container'),
+        'on-primary-fixed': withOpacity('--on-primary-fixed'),
+        'on-primary-fixed-variant': withOpacity('--on-primary-fixed-variant'),
+        'inverse-primary': withOpacity('--inverse-primary'),
+        'secondary': withOpacity('--secondary'),
+        'secondary-container': withOpacity('--secondary-container'),
+        'secondary-fixed': withOpacity('--secondary-fixed'),
+        'secondary-fixed-dim': withOpacity('--secondary-fixed-dim'),
+        'on-secondary': withOpacity('--on-secondary'),
+        'on-secondary-container': withOpacity('--on-secondary-container'),
+        'on-secondary-fixed': withOpacity('--on-secondary-fixed'),
+        'on-secondary-fixed-variant': withOpacity('--on-secondary-fixed-variant'),
+        'tertiary': withOpacity('--tertiary'),
+        'tertiary-container': withOpacity('--tertiary-container'),
+        'tertiary-fixed': withOpacity('--tertiary-fixed'),
+        'tertiary-fixed-dim': withOpacity('--tertiary-fixed-dim'),
+        'on-tertiary': withOpacity('--on-tertiary'),
+        'on-tertiary-container': withOpacity('--on-tertiary-container'),
+        'on-tertiary-fixed': withOpacity('--on-tertiary-fixed'),
+        'on-tertiary-fixed-variant': withOpacity('--on-tertiary-fixed-variant'),
+        'error': withOpacity('--error'),
+        'error-container': withOpacity('--error-container'),
+        'on-error': withOpacity('--on-error'),
+        'on-error-container': withOpacity('--on-error-container'),
+        'on-background': withOpacity('--on-background'),
+      },
+      borderRadius: {
+        DEFAULT: '0.25rem',
+        md: '0.375rem',
+        lg: '0.5rem',
+        xl: '0.75rem',
+        full: '9999px',
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        'body-md': ['Inter', 'sans-serif'],
+        'body-sm': ['Inter', 'sans-serif'],
+        'body-lg': ['Inter', 'sans-serif'],
+        'label-md': ['"JetBrains Mono"', 'monospace'],
+        'label-sm': ['"JetBrains Mono"', 'monospace'],
+        'headline-lg': ['Inter', 'sans-serif'],
+        'headline-md': ['Inter', 'sans-serif'],
+        'headline-sm': ['Inter', 'sans-serif'],
+        'code-md': ['"JetBrains Mono"', 'monospace'],
+        'code-sm': ['"JetBrains Mono"', 'monospace'],
+      },
+      spacing: {
+        'gutter': '1rem',
+        'gutter-compact': '0.5rem',
+        'space-xs': '0.25rem',
+        'space-sm': '0.5rem',
+        'space-md': '0.75rem',
+        'space-lg': '1.25rem',
+        'space-xl': '2rem',
+        'margin': '1.5rem',
+        'margin-mobile': '1rem',
+      },
+    },
+  },
+  plugins: [],
+};
