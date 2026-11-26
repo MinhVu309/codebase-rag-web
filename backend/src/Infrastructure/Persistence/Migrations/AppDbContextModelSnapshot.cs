@@ -133,6 +133,33 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("conversations", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.ConversationRepository", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid>("RepositoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repository_id");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
+
+                    b.Property<Guid?>("AddedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by_user_id");
+
+                    b.HasKey("ConversationId", "RepositoryId");
+
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("RepositoryId");
+
+                    b.ToTable("conversation_repositories", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -162,9 +189,17 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("error_code");
 
+                    b.Property<string>("FocusRepositoryIds")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("focus_repository_ids");
+
                     b.Property<int?>("LatencyMs")
                         .HasColumnType("integer")
                         .HasColumnName("latency_ms");
+
+                    b.Property<string>("RetrievalSnapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("retrieval_snapshot");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -311,6 +346,30 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Domain.Entities.ConversationRepository", b =>
+                {
+                    b.HasOne("Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Entities.Conversation", "Conversation")
+                        .WithMany("Repositories")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.CodeRepository", "Repository")
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Repository");
+                });
+
             modelBuilder.Entity("Domain.Entities.Message", b =>
                 {
                     b.HasOne("Domain.Entities.Conversation", "Conversation")
@@ -347,6 +406,8 @@ namespace Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Domain.Entities.Conversation", b =>
                 {
                     b.Navigation("Messages");
+
+                    b.Navigation("Repositories");
                 });
 
             modelBuilder.Entity("Domain.Entities.Project", b =>

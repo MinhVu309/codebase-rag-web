@@ -91,9 +91,30 @@ internal class MessageConfiguration : IEntityTypeConfiguration<Message>
         b.Property(x => x.Role).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.Content).IsRequired();
         b.Property(x => x.Citations).HasColumnType("jsonb");
+        b.Property(x => x.RetrievalSnapshot).HasColumnType("jsonb");
+        b.Property(x => x.FocusRepositoryIds).HasColumnType("jsonb");
         b.Property(x => x.ErrorCode).HasMaxLength(50);
         b.HasIndex(x => new { x.ConversationId, x.CreatedAt });
         b.HasOne(x => x.Conversation).WithMany(c => c.Messages).HasForeignKey(x => x.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal class ConversationRepositoryConfiguration : IEntityTypeConfiguration<ConversationRepository>
+{
+    public void Configure(EntityTypeBuilder<ConversationRepository> b)
+    {
+        b.ToTable("conversation_repositories");
+        // The composite key is the "unique (conversation, repository)" rule and also serves lookups by conversation.
+        b.HasKey(x => new { x.ConversationId, x.RepositoryId });
+        b.HasIndex(x => x.RepositoryId);
+        b.HasOne(x => x.Conversation).WithMany(c => c.Repositories).HasForeignKey(x => x.ConversationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Repository).WithMany().HasForeignKey(x => x.RepositoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // Deleting the user deletes their conversations anyway; this keeps the column honest if only the user row of
+        // an "added by" goes away first.
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.AddedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

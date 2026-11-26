@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CodeRepository> Repositories => Set<CodeRepository>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<ConversationRepository> ConversationRepositories => Set<ConversationRepository>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

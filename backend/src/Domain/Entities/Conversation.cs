@@ -11,4 +11,7 @@ public class Conversation
     public Project Project { get; set; } = null!;
     public User User { get; set; } = null!;
     public List<Message> Messages { get; set; } = [];
+
+    /// <summary>The Conversation Scope (D40): repositories this conversation may search.</summary>
+    public List<ConversationRepository> Repositories { get; set; } = [];
 }
