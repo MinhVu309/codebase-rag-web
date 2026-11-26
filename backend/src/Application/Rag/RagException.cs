@@ -31,6 +31,8 @@ public static class RagErrorCodes
     public const string InvalidRepo = "INVALID_REPO";
     /// <summary>422 validation error. Not in the original 11 codes of Contract v0.2; added by openapi.yaml (see contracts/README.md).</summary>
     public const string InvalidRequest = "INVALID_REQUEST";
+    /// <summary>503 from POST /v1/query/multi: none of the supplied indexes can be queried (Contract v0.3).</summary>
+    public const string AllIndexesUnavailable = "ALL_INDEXES_UNAVAILABLE";
     public const string IndexNotReady = "INDEX_NOT_READY";
     public const string IndexNotFound = "INDEX_NOT_FOUND";
     public const string FileNotFound = "FILE_NOT_FOUND";
@@ -45,11 +47,25 @@ public static class RagErrorCodes
 }
 
 /// <summary>A failed call to the RAG service, already classified. <c>UpstreamMessage</c> is for logs only.</summary>
-public sealed class RagException(RagFailureKind kind, string code, int? upstreamStatus = null, string? upstreamMessage = null)
+public class RagException(RagFailureKind kind, string code, int? upstreamStatus = null, string? upstreamMessage = null)
     : AppException($"RAG call failed: {code}")
 {
     public RagFailureKind Kind { get; } = kind;
     public string Code { get; } = code;
     public int? UpstreamStatus { get; } = upstreamStatus;
     public string? UpstreamMessage { get; } = upstreamMessage;
+}
+
+/// <summary>
+/// POST /v1/query/multi answered 503 <c>ALL_INDEXES_UNAVAILABLE</c>: no repository in the Scope could be queried.
+/// It is still a <see cref="RagException"/> (kind <see cref="RagFailureKind.Unavailable"/>, so existing handlers treat it
+/// as "RAG unavailable"), but carries the per-repository outcomes from <c>error.details.repository_outcomes</c> so the
+/// caller can store them in the message snapshot (E2). Outcomes may be sparse: the yaml example has only
+/// repository_id, outcome and reason.
+/// </summary>
+public sealed class RagAllIndexesUnavailableException(
+    IReadOnlyList<RagRepositoryOutcome> outcomes, int? upstreamStatus = 503, string? upstreamMessage = null)
+    : RagException(RagFailureKind.Unavailable, RagErrorCodes.AllIndexesUnavailable, upstreamStatus, upstreamMessage)
+{
+    public IReadOnlyList<RagRepositoryOutcome> RepositoryOutcomes { get; } = outcomes;
 }

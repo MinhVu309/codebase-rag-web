@@ -46,6 +46,26 @@ public class RecordingRagClient : IRagClient
         return Task.FromResult(OnQuery?.Invoke(indexId) ?? DefaultAnswer);
     }
 
+    /// <summary>Calls to QueryMultiAsync, for the multi-repository tests that come after J1.</summary>
+    public List<(string Question, IReadOnlyList<RagMultiScopeItem> Scope, IReadOnlyList<string>? Focus, int TopK)> MultiQueries { get; } = [];
+    public RagException? QueryMultiError { get; set; }
+    public Func<RagMultiAnswer>? OnQueryMulti { get; set; }
+
+    public Task<RagMultiAnswer> QueryMultiAsync(string question, IReadOnlyList<RagMultiScopeItem> scope,
+        IReadOnlyList<string>? focusRepositoryIds, int topK, RagQueryOptions? options = null, CancellationToken ct = default)
+    {
+        MultiQueries.Add((question, scope, focusRepositoryIds, topK));
+        if (QueryMultiError is not null) throw QueryMultiError;
+        if (OnQueryMulti is not null) return Task.FromResult(OnQueryMulti());
+        var first = scope[0];
+        return Task.FromResult(new RagMultiAnswer("completed", "answered", "Canned multi answer [1].",
+            new RagMultiFocus([.. focusRepositoryIds ?? []], [], [], false, null),
+            [.. scope.Select(s => new RagRepositoryOutcome(s.RepositoryId, s.IndexId, "abc123",
+                s == first ? "searched_with_evidence" : "searched_no_evidence", null, s == first ? 1 : 0, 10))],
+            [new RagMultiCitation(1, first.RepositoryId, first.IndexId, "abc123", "src/Foo.cs", null, null, 1, 3, "x", 0.9)],
+            null, 100));
+    }
+
     public static RagAnswer DefaultAnswer { get; } = new(
         "The handler lives in Foo [1] and is wired up in Bar [2].",
         [

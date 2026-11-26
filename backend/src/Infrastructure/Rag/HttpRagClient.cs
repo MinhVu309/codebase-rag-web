@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 namespace Infrastructure.Rag;
 
 /// <summary>
-/// Hand-written client for RAG Contract v0.2. Sends <c>X-API-Key</c> (except on /v1/health) and
+/// Hand-written client for RAG Contract v0.3 (v0.2 endpoints + POST /v1/query/multi). Sends <c>X-API-Key</c> (except on /v1/health) and
 /// <c>X-Request-ID</c>. Logs method, path, status, duration and request id only: never the question,
 /// file content, API key or response bodies.
 /// </summary>
@@ -94,6 +94,58 @@ public class HttpRagClient(
         return new RagAnswer(dto.Answer, citations, dto.Usage?.Clone(), dto.LatencyMs);
     }
 
+    public async Task<RagMultiAnswer> QueryMultiAsync(
+        string question,
+        IReadOnlyList<RagMultiScopeItem> scope,
+        IReadOnlyList<string>? focusRepositoryIds,
+        int topK,
+        RagQueryOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (scope.Count == 0) throw new ArgumentException("scope must not be empty", nameof(scope));
+
+        var o = options ?? new RagQueryOptions();
+        // Focus: omit the field when empty. The yaml allows "omitted or empty" for "search the whole Scope"; omitting
+        // sends the smaller payload and never depends on how a validator treats an empty array.
+        List<string>? focus = focusRepositoryIds is { Count: > 0 } ? [.. focusRepositoryIds] : null;
+        var payload = new MultiQueryBody(
+            question,
+            [.. scope.Select(s => new MultiScopeItemBody(s.RepositoryId, s.IndexId, s.DisplayName))],
+            focus, topK, new QueryOptionsDto(o.Mode, o.Rerank), Debug: false);
+
+        // Same timeout as /v1/query (RAG_QUERY_TIMEOUT_SECONDS, 65s > RAG's own 60s deadline); SendAsync never retries.
+        var body = await SendAsync(HttpMethod.Post, "v1/query/multi", payload, _options.QueryTimeout, true, ct);
+        var dto = Parse<MultiQueryResponse>(body);
+
+        if (dto.Answer is null) throw Invalid("missing answer");
+        if (string.IsNullOrWhiteSpace(dto.ExecutionStatus)) throw Invalid("missing execution_status");
+        if (string.IsNullOrWhiteSpace(dto.AnswerStatus)) throw Invalid("missing answer_status");
+        if (dto.Focus is null) throw Invalid("missing focus");
+        if (dto.RepositoryOutcomes is null) throw Invalid("missing repository_outcomes");
+
+        var outcomes = dto.RepositoryOutcomes.Select(ToOutcomeStrict).ToList();
+        var citations = (dto.Citations ?? []).Select(ToCitationStrict).ToList();
+        var focusResult = new RagMultiFocus(
+            dto.Focus.RequestedRepositoryIds ?? [],
+            dto.Focus.SearchedFocusRepositoryIds ?? [],
+            dto.Focus.FallbackRepositoryIds ?? [],
+            dto.Focus.FallbackTriggered,
+            dto.Focus.FallbackReason);
+
+        WarnIfUnknown("execution_status", dto.ExecutionStatus, RagMultiValues.ExecutionStatuses);
+        WarnIfUnknown("answer_status", dto.AnswerStatus, RagMultiValues.AnswerStatuses);
+        WarnIfUnknown("fallback_reason", focusResult.FallbackReason, RagMultiValues.FallbackReasons);
+        foreach (var outcome in outcomes)
+        {
+            WarnIfUnknown("outcome", outcome.Outcome, RagMultiValues.Outcomes);
+            WarnIfUnknown("reason", outcome.Reason, RagMultiValues.Reasons);
+        }
+
+        return new RagMultiAnswer(dto.ExecutionStatus, dto.AnswerStatus, dto.Answer, focusResult,
+            outcomes, citations, dto.Usage?.Clone(), dto.LatencyMs);
+    }
+
     public async Task<RagFile> GetFileAsync(string indexId, string path, int start, int end, CancellationToken ct = default)
     {
         var url = $"v1/indexes/{Uri.EscapeDataString(indexId)}/files" +
@@ -168,16 +220,22 @@ public class HttpRagClient(
     private static RagException FromErrorResponse(HttpStatusCode status, string body)
     {
         string? code = null, message = null;
+        JsonElement? details = null;
         try
         {
             var envelope = JsonSerializer.Deserialize<ErrorEnvelope>(body, RagJson.Options);
             code = envelope?.Error?.Code;
             message = envelope?.Error?.Message;
+            details = envelope?.Error?.Details;
         }
         catch (JsonException)
         {
             // Not the contract's error format (e.g. an HTML error page from a proxy): fall back to the status.
         }
+
+        // POST /v1/query/multi: nothing in the Scope could be queried. The outcomes explain why (E2).
+        if (code == RagErrorCodes.AllIndexesUnavailable)
+            return new RagAllIndexesUnavailableException(ParseErrorOutcomes(details), (int)status, message);
 
         var kind = code switch
         {
@@ -235,6 +293,60 @@ public class HttpRagClient(
         {
             throw Invalid("malformed JSON");
         }
+    }
+
+    /// <summary>
+    /// Reads <c>error.details.repository_outcomes</c> of a 503. Best effort: the yaml example has only
+    /// repository_id/outcome/reason, and a body that does not fit simply yields fewer (or no) outcomes.
+    /// </summary>
+    private static List<RagRepositoryOutcome> ParseErrorOutcomes(JsonElement? details)
+    {
+        var result = new List<RagRepositoryOutcome>();
+        if (details is not { ValueKind: JsonValueKind.Object } d
+            || !d.TryGetProperty("repository_outcomes", out var array)
+            || array.ValueKind != JsonValueKind.Array)
+            return result;
+
+        foreach (var item in array.EnumerateArray())
+        {
+            try
+            {
+                var o = item.Deserialize<MultiOutcomeDto>(RagJson.Options);
+                if (o is { RepositoryId: { Length: > 0 } repo, Outcome: { Length: > 0 } outcome })
+                    result.Add(new RagRepositoryOutcome(repo, o.IndexId, o.CommitSha, outcome, o.Reason, o.EvidenceCount, o.LatencyMs));
+            }
+            catch (JsonException)
+            {
+                // Skip an entry of the wrong shape; the 503 itself is what matters.
+            }
+        }
+        return result;
+    }
+
+    private static RagRepositoryOutcome ToOutcomeStrict(MultiOutcomeDto o)
+    {
+        if (string.IsNullOrWhiteSpace(o.RepositoryId) || string.IsNullOrWhiteSpace(o.Outcome))
+            throw Invalid("repository outcome without repository_id or outcome");
+        return new RagRepositoryOutcome(o.RepositoryId, o.IndexId, o.CommitSha, o.Outcome, o.Reason, o.EvidenceCount, o.LatencyMs);
+    }
+
+    private static RagMultiCitation ToCitationStrict(MultiCitationDto c)
+    {
+        if (string.IsNullOrWhiteSpace(c.RepositoryId) || string.IsNullOrWhiteSpace(c.IndexId))
+            throw Invalid("citation without repository_id or index_id");
+        return new RagMultiCitation(c.RefId, c.RepositoryId, c.IndexId, c.CommitSha, c.FilePath ?? "", c.Symbol,
+            c.SymbolKind, c.StartLine, c.EndLine, c.Snippet ?? "", c.Score);
+    }
+
+    /// <summary>
+    /// A status/outcome/reason RAG added after v0.3 is kept as the raw string (callers must cope with it); this only
+    /// leaves a trace. The values are RAG vocabulary, not user data, and are truncated.
+    /// </summary>
+    private void WarnIfUnknown(string field, string? value, IReadOnlyList<string> known)
+    {
+        if (value is null || known.Contains(value)) return;
+        logger.LogWarning("RAG multi response has an unrecognised {Field} value {Value}; kept as-is",
+            field, value.Length > 64 ? value[..64] : value);
     }
 
     private static IndexStatus ParseStatus(string? value) =>

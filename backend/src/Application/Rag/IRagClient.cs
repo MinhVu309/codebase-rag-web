@@ -21,6 +21,22 @@ public interface IRagClient
     /// <summary>POST /v1/query. Single-turn (no history). Not retried.</summary>
     Task<RagAnswer> QueryAsync(string indexId, string question, int topK, RagQueryOptions? options = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// POST /v1/query/multi (Contract v0.3, D40): one question over a Conversation Scope (1-5 repositories), one fused
+    /// answer. <paramref name="scope"/> must already be authorized and resolved server-side; <paramref name="focusRepositoryIds"/>
+    /// is an optional soft preference that must be a subset of the scope (RAG answers 422 otherwise); null or empty means
+    /// "search the whole scope" and is not sent. Not retried. <c>debug</c> is always false (<paramref name="options"/>.Debug is ignored).
+    /// Besides the usual <see cref="RagException"/> kinds, a 503 <c>ALL_INDEXES_UNAVAILABLE</c> throws
+    /// <see cref="RagAllIndexesUnavailableException"/> with the per-repository outcomes.
+    /// </summary>
+    Task<RagMultiAnswer> QueryMultiAsync(
+        string question,
+        IReadOnlyList<RagMultiScopeItem> scope,
+        IReadOnlyList<string>? focusRepositoryIds,
+        int topK,
+        RagQueryOptions? options = null,
+        CancellationToken ct = default);
+
     /// <summary>GET /v1/indexes/{id}/files. At most 2000 lines per call.</summary>
     Task<RagFile> GetFileAsync(string indexId, string path, int start, int end, CancellationToken ct = default);
 
