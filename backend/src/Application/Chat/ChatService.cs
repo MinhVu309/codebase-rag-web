@@ -20,7 +20,6 @@ public partial class ChatService(
     IRagClient rag,
     RagQueryOptions queryOptions,
     RepositoryService repositories,
-    ConversationScopeSettings scopeSettings,
     IValidator<CreateConversationRequest> createValidator,
     IValidator<UpdateConversationRequest> renameValidator,
     IValidator<AskRequest> askValidator,
