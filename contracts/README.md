@@ -7,9 +7,10 @@ mirrors it. **Do not edit it here.** If the contract has to change, tell Giang f
 | | |
 |---|---|
 | Source | https://github.com/CALLMEKANEKI/codebase-rag-service (public), path `contracts/openapi.yaml` |
-| Commit | `d6e0038c4ec10822dae2047634a5c7102d8e432f` |
-| Version (`info.version`) | `0.2.0-draft` |
-| sha256 | `113faca43379d4167577f48b39b78276350999553d728120562588ce6478baa8` |
+| Commit | `195e2a967509a2a2b6682604522cd071b7151ca1` (`195e2a9`), branch `work/wp6-retrieval-reranking`; the yaml itself last changed in `beb879c` |
+| Version (`info.version`) | `0.3.0` |
+| sha256 | `5f397fa87fb1fe2444f17d6fb4d7f033c2b1584a6ff7fed44d6e344daaadc606` |
+| Status | **Pinned from an unmerged branch** (Contract v2 / D40, approved 25/11): pin again when RAG merges it into `main`. |
 
 Verify the pin:
 
@@ -30,4 +31,5 @@ shasum -a 256 contracts/openapi.yaml    # must print the sha256 above
 
 - **Mock (Prism):** `docker compose --profile mock up mock-rag` serves this file on http://localhost:4010 (see the
   root README, "Mock RAG").
-- **Tests:** `ContractExampleTests` feeds the yaml's examples through `HttpRagClient`.
+- **Tests:** `ContractExampleTests` feeds the yaml's examples through `HttpRagClient`; `MultiQueryContractTests` does
+  the same for `POST /v1/query/multi` (200 partial + fallback, 503 `ALL_INDEXES_UNAVAILABLE`, error responses).
