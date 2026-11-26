@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* GITHUB LIGHT PRIMER THEME + LINEAR INDIGO ACCENT */
+    --background: 255 255 255;             /* #ffffff GitHub Canvas default */
+    --foreground: 31 35 40;                /* #1f2328 GitHub text primary (charcoal) */
+    --card: 246 248 250;                   /* #f6f8fa GitHub Canvas subtle (100% solid) */
+    --card-foreground: 31 35 40;           /* #1f2328 */
+    --popover: 255 255 255;                /* #ffffff GitHub Canvas overlay (100% solid) */
+    --popover-foreground: 31 35 40;
+    --border: 208 215 222;                 /* #d0d7de GitHub border default */
+    --muted: 246 248 250;                  /* #f6f8fa */
+    --muted-foreground: 101 109 118;       /* #656d76 GitHub text secondary */
+    --accent: 234 238 242;                 /* #eaeef2 GitHub neutral hover */
+    --accent-foreground: 31 35 40;
+    --primary: 79 70 229;                  /* #4f46e5 Linear Indigo-600 */
+    --primary-container: 99 102 241;       /* #6366f1 */
+    --on-primary: 255 255 255;
+    --on-primary-container: 255 255 255;
+    --secondary: 26 127 55;                /* #1a7f37 GitHub success green */
+    --secondary-container: 220 252 231;
+    --on-secondary: 255 255 255;
+    --on-secondary-container: 20 83 45;
+    --tertiary: 154 103 0;                 /* #9a6700 GitHub attention amber */
+    --tertiary-container: 254 243 199;
+    --on-tertiary: 255 255 255;
+    --destructive: 207 34 46;              /* #cf222e GitHub danger red */
+    --destructive-foreground: 255 255 255;
+    --error: 207 34 46;
+    --error-container: 255 235 233;
+    --on-error: 255 255 255;
+    --on-error-container: 164 14 38;
+
+    /* Material / Stitch Legacy Aliases (100% Solid) */
+    --surface: 255 255 255;
+    --surface-dim: 246 248 250;
+    --surface-bright: 255 255 255;
+    --surface-variant: 246 248 250;
+    --surface-container-lowest: 255 255 255;
+    --surface-container-low: 246 248 250;
+    --surface-container: 246 248 250;
+    --surface-container-high: 234 238 242;
+    --surface-container-highest: 208 215 222;
+    --on-surface: 31 35 40;
+    --on-surface-variant: 101 109 118;
+    --inverse-surface: 31 35 40;
+    --inverse-on-surface: 246 248 250;
+    --outline: 140 149 159;
+    --outline-variant: 208 215 222;
+    --primary-fixed: 224 231 255;
+    --primary-fixed-dim: 199 210 254;
+    --on-primary-fixed: 49 46 129;
+    --on-primary-fixed-variant: 67 56 202;
+    --inverse-primary: 165 180 252;
+    --secondary-fixed: 209 250 229;
+    --secondary-fixed-dim: 167 243 208;
+    --on-background: 31 35 40;
+  }
+
+  .dark {
+    /* GITHUB DARK PRIMER THEME + LINEAR INDIGO ACCENT */
+    --background: 13 17 23;                /* #0d1117 GitHub Canvas default */
+    --foreground: 230 237 243;             /* #e6edf3 GitHub text primary (gentle off-white) */
+    --card: 22 27 34;                      /* #161b22 GitHub Canvas subtle (100% solid) */
+    --card-foreground: 230 237 243;        /* #e6edf3 */
+    --popover: 33 38 45;                   /* #21262d GitHub Canvas overlay (100% solid) */
+    --popover-foreground: 230 237 243;
+    --border: 48 54 61;                    /* #30363d GitHub 1px crisp border */
+    --muted: 33 38 45;                     /* #21262d */
+    --muted-foreground: 132 141 151;       /* #848d97 GitHub text secondary */
+    --accent: 33 38 45;                    /* #21262d GitHub neutral hover */
+    --accent-foreground: 230 237 243;
+    --primary: 99 102 241;                 /* #6366f1 Linear Indigo-500 */
+    --primary-container: 79 70 229;        /* #4f46e5 */
+    --on-primary: 255 255 255;
+    --on-primary-container: 255 255 255;
+    --secondary: 63 185 80;                /* #3fb950 GitHub success green */
+    --secondary-container: 35 134 54;
+    --on-secondary: 255 255 255;
+    --on-secondary-container: 255 255 255;
+    --tertiary: 210 153 34;                /* #d29922 GitHub attention amber */
+    --tertiary-container: 158 106 3;
+    --on-tertiary: 255 255 255;
+    --destructive: 248 81 73;              /* #f85149 GitHub danger red */
+    --destructive-foreground: 255 255 255;
+    --error: 248 81 73;
+    --error-container: 136 20 27;
+    --on-error: 255 255 255;
+    --on-error-container: 255 205 210;
+
+    /* Material / Stitch Legacy Aliases (100% Solid) */
+    --surface: 13 17 23;
+    --surface-dim: 13 17 23;
+    --surface-bright: 33 38 45;
+    --surface-variant: 33 38 45;
+    --surface-container-lowest: 13 17 23;
+    --surface-container-low: 22 27 34;
+    --surface-container: 22 27 34;
+    --surface-container-high: 33 38 45;
+    --surface-container-highest: 48 54 61;
+    --on-surface: 230 237 243;
+    --on-surface-variant: 132 141 151;
+    --inverse-surface: 230 237 243;
+    --inverse-on-surface: 22 27 34;
+    --outline: 110 118 129;
+    --outline-variant: 48 54 61;
+    --primary-fixed: 224 231 255;
+    --primary-fixed-dim: 129 140 248;
+    --on-primary-fixed: 49 46 129;
+    --on-primary-fixed-variant: 67 56 202;
+    --inverse-primary: 79 70 229;
+    --secondary-fixed: 209 250 229;
+    --secondary-fixed-dim: 167 243 208;
+    --on-background: 230 237 243;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* GitHub Primer style scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--border));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--outline));
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+}

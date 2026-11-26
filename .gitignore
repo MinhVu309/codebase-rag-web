@@ -6,3 +6,10 @@ obj/
 .env
 .env.*
 !.env.example
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.log
+.DS_Store
