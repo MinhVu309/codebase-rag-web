@@ -93,12 +93,12 @@ RAG_QUERY_RERANK=false                           # true chỉ hợp lệ khi mod
 
 ### D40: nhiều repository trong một hội thoại (đang làm)
 
-**D40 đang làm; API Web chưa đổi.** Mới có phía gọi RAG (`IRagClient.QueryMultiAsync` gọi `POST /v1/query/multi`, hợp đồng v0.3 trong [contracts/](contracts/README.md)) và hai biến cấu hình. Luồng hỏi đáp vẫn dùng `POST /v1/query` trên repository đang active; chưa có bảng Scope, chưa có endpoint mới, frontend không phải làm gì.
+**D40 đang làm; luồng hỏi chưa đổi.** Đã có phía gọi RAG (`IRagClient.QueryMultiAsync` gọi `POST /v1/query/multi`, hợp đồng v0.3 trong [contracts/](contracts/README.md)), bảng Scope (repository của một hội thoại) và ba endpoint quản lý Scope (xem "Conversation Scope" ở phần dành cho frontend). Việc hỏi đáp vẫn dùng `POST /v1/query` trên repository đang active của project; Focus và bản chụp lịch sử (snapshot) làm ở bước tiếp theo. Các endpoint cũ không đổi; thay đổi duy nhất là `POST /api/projects/{id}/conversations` nhận thêm `initialRepositoryId` tuỳ chọn.
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `RAG_QUERY_API` | `single` | `single` = `POST /v1/query` (như hiện nay, cũng là đường lùi). `multi` = `POST /v1/query/multi`. Giá trị khác làm API không khởi động. Chưa được luồng hỏi đọc. |
-| `CONVERSATION_SCOPE_MAX` | `5` | Số repository tối đa trong một hội thoại, từ 1 đến 5 (yaml v0.3 giới hạn `scope` tối đa 5 phần tử, nên lớn hơn 5 bị từ chối lúc khởi động). Chưa được dùng. |
+| `RAG_QUERY_API` | `single` | `single` = `POST /v1/query` (như hiện nay, cũng là đường lùi). `multi` = `POST /v1/query/multi`. Giá trị khác làm API không khởi động. Hiện chỉ có một tác dụng: ở `multi`, tạo hội thoại **bắt buộc** có `initialRepositoryId`. Luồng hỏi đáp chưa đọc biến này. |
+| `CONVERSATION_SCOPE_MAX` | `5` | Số repository tối đa trong một hội thoại, từ 1 đến 5 (yaml v0.3 giới hạn `scope` tối đa 5 phần tử, nên lớn hơn 5 bị từ chối lúc khởi động). Dùng khi thêm repository vào hội thoại (409 `SCOPE_LIMIT_REACHED` khi đủ). |
 
 `/v1/query/multi` dùng chung `RAG_QUERY_MODE`, `RAG_QUERY_RERANK` và `RAG_QUERY_TIMEOUT_SECONDS` (65s) với `/v1/query`, không tự retry, luôn gửi `debug=false`, và không gửi `focus_repository_ids` khi Focus rỗng.
 
@@ -161,9 +161,12 @@ Tất cả cần đăng nhập, trừ `health`, `register`, `login`, `refresh`, 
 | GET | `/api/repositories/{id}` | Trạng thái repository, dùng để poll |
 | GET | `/api/repositories/{id}/files` | Code viewer: đọc một đoạn file của bản đã index (`?path=&start=&end=`, xem "Code viewer" bên dưới) |
 | DELETE | `/api/repositories/{id}` | Xoá repository |
-| GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn, cùng luật title với đổi tên, xem "Quản lý hội thoại") |
+| GET, POST | `/api/projects/{id}/conversations` | Danh sách, tạo hội thoại (body: `title` tuỳ chọn, cùng luật title với đổi tên, xem "Quản lý hội thoại"; `initialRepositoryId` tuỳ chọn ở chế độ `single`, bắt buộc ở `multi`, xem "Conversation Scope") |
 | PATCH | `/api/conversations/{id}` | Đổi tên hội thoại (body: `title`, xem "Quản lý hội thoại" bên dưới). Trả 200 với `ConversationDto` |
 | DELETE | `/api/conversations/{id}` | Xoá hội thoại cùng toàn bộ tin nhắn và citation của nó. Trả 204 |
+| GET | `/api/conversations/{id}/repositories` | Conversation Scope: các repository của hội thoại (xem "Conversation Scope") |
+| POST | `/api/conversations/{id}/repositories` | Thêm một repository vào Scope (body: `repositoryId`). Trả 200 với Scope sau khi thêm |
+| DELETE | `/api/conversations/{id}/repositories/{repositoryId}` | Bỏ một repository khỏi Scope. Trả 204 |
 | GET | `/api/conversations/{id}/messages` | Lịch sử tin nhắn (`?limit=`, mặc định 200, tối đa 500) |
 | POST | `/api/conversations/{id}/messages` | Hỏi một câu (body: `question` tối đa 2000 ký tự, `topK` từ 1 đến 20 tuỳ chọn) |
 
@@ -193,6 +196,9 @@ Mọi lỗi là ProblemDetails (JSON). Lỗi validate (400) có thêm `errors` t
 | `INDEX_NOT_READY` | 409 | Repository chưa index xong, bảo người dùng chờ |
 | `NO_REPOSITORY` | 409 | Project chưa import repository nào |
 | `REPOSITORY_FAILED` | 409 | Index thất bại, gợi ý xoá và import lại |
+| `REPOSITORY_NOT_READY` | 409 | Repository chưa `ready` nên chưa tạo hội thoại với nó / chưa thêm vào Scope được (khác `INDEX_NOT_READY` là lỗi lúc hỏi) |
+| `SCOPE_LIMIT_REACHED` | 409 | Scope đã đủ số repository tối đa (mặc định 5), hãy bỏ bớt một repository rồi thêm lại |
+| `SCOPE_CANNOT_BE_EMPTY` | 409 | Không bỏ được repository cuối cùng của Scope |
 | `INVALID_REPO`, `REPO_TOO_LARGE` | 422 | URL không hỗ trợ hoặc repository quá lớn |
 | `INVALID_REQUEST` | 422 | RAG từ chối request không hợp lệ (validation). Thông báo chung "Yêu cầu không hợp lệ" |
 | `LLM_ERROR` | 502 | Hệ thống AI lỗi tạm thời, cho thử lại |
@@ -260,6 +266,47 @@ Response (camelCase):
 - Sau khi xoá, mọi gọi tới hội thoại đó (xem tin nhắn, hỏi tiếp, đổi tên, xoá lần nữa) đều trả 404.
 
 Cả hai: hội thoại của người khác và hội thoại không tồn tại cho cùng một **404** (kiểm tra quyền trước khi validate body, nên body sai trên hội thoại của người khác vẫn là 404). Chưa đăng nhập thì 401.
+
+### Conversation Scope (D40, đang làm)
+
+Mỗi hội thoại có một **Scope**: tập repository mà hội thoại được phép tìm trong đó (tối đa `CONVERSATION_SCOPE_MAX`, mặc định 5). Bước này mới có phần **quản lý Scope**; **luồng hỏi chưa đổi** (câu hỏi vẫn được trả lời từ repository active của project, xem "Repository đang hoạt động"). Focus (ưu tiên repository cho từng câu hỏi) và snapshot lịch sử ở bước tiếp theo. Mọi response ở đây **không bao giờ có `indexId`/`index_id`**.
+
+**Tạo hội thoại với repository đầu tiên:** `POST /api/projects/{id}/conversations`
+
+```json
+{ "title": "Luồng đơn hàng", "initialRepositoryId": "5b0c0a3e-3f7e-4b6a-9d2e-0d6f1b8f2a11" }
+```
+
+Response vẫn là `{ id, projectId, title, createdAt }`, không đổi dạng. Hội thoại và thành viên Scope đầu tiên được tạo cùng một lúc (một transaction).
+
+- `initialRepositoryId` phải là repository `ready` của **chính project này**. Không phải (của project khác, của người khác, không tồn tại) thì **404** cùng thông báo với "project không tồn tại". Có nhưng chưa `ready` thì **409 `REPOSITORY_NOT_READY`**.
+- **Tuỳ chọn** khi `RAG_QUERY_API=single` (mặc định): bỏ qua thì backend dùng repository active của project nếu nó đã `ready`, không thì hội thoại bắt đầu với Scope rỗng, đúng như trước. **Bắt buộc** khi `RAG_QUERY_API=multi`: thiếu thì **400** với `errors.InitialRepositoryId`. Frontend nên gửi luôn từ bây giờ.
+- Thứ tự kiểm tra: project (404) → repository (404) → body (400) → trạng thái (409).
+
+**Xem Scope:** `GET /api/conversations/{id}/repositories` (xếp theo thời điểm thêm, cũ trước)
+
+```json
+[
+  { "repositoryId": "5b0c0a3e-3f7e-4b6a-9d2e-0d6f1b8f2a11", "displayName": "pallets/flask", "repoUrl": "https://github.com/pallets/flask",
+    "status": "ready", "commitSha": "d086db856be1...", "addedAt": "2026-11-26T08:15:02.113+00:00" }
+]
+```
+
+`displayName` là `owner/repo` lấy từ `repoUrl`. `status` là trạng thái hiện tại của repository (có thể không còn `ready` nếu nó lỗi sau khi được thêm), `commitSha` có thể `null`. Scope rỗng trả `[]`.
+
+**Thêm:** `POST /api/conversations/{id}/repositories` với `{ "repositoryId": "..." }`. Trả **200** với toàn bộ Scope sau khi thêm (cùng dạng `GET`).
+
+- Repository phải thuộc cùng project với hội thoại, không thì 404. Chưa `ready` thì 409 `REPOSITORY_NOT_READY`.
+- Đã có trong Scope thì vẫn **200** và không đổi gì (gọi lại an toàn, kể cả khi Scope đã đầy).
+- Scope đã đủ số tối đa thì **409 `SCOPE_LIMIT_REACHED`**, Scope giữ nguyên. Giới hạn do backend giữ, kể cả khi hai yêu cầu đến cùng lúc. Nút "+ Add repository" vẫn nên luôn hiện; khi đủ thì giải thích giới hạn và không cho thêm.
+- Thiếu `repositoryId` thì 400 với `errors.RepositoryId`.
+
+**Bỏ:** `DELETE /api/conversations/{id}/repositories/{repositoryId}` trả **204**.
+
+- Repository không nằm trong Scope (hoặc không tồn tại) thì **404**. Là thành viên cuối cùng thì **409 `SCOPE_CANNOT_BE_EMPTY`** và không bỏ.
+- Chỉ bỏ khỏi Scope: repository, tin nhắn và citation cũ không bị ảnh hưởng.
+
+**Chung:** hội thoại của người khác và hội thoại không tồn tại cho cùng một **404** (kiểm tra trước mọi validate, nên body sai trên hội thoại của người khác vẫn là 404); chưa đăng nhập thì 401. Xoá một repository (`DELETE /api/repositories/{id}`) thì nó tự biến khỏi mọi Scope, còn tin nhắn và citation cũ giữ nguyên; Scope có thể thành rỗng (khi hỏi bằng luồng mới sẽ là 409 `NO_REPOSITORY_IN_SCOPE`, chưa có ở bước này). Hội thoại tạo trước bản này được tạo sẵn Scope gồm repository active của project (nếu có), nếu không thì Scope rỗng.
 
 ### Hiển thị câu trả lời
 
