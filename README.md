@@ -91,6 +91,38 @@ RAG_QUERY_RERANK=false                           # true chỉ hợp lệ khi mod
 - Từ container không gọi được `host.docker.internal:8000` thì chạy RAG với `--host 0.0.0.0` (chỉ làm khi cần, vì khi đó máy khác trong mạng cũng gọi được cổng 8000, tuy vẫn bị chặn bởi `X-API-Key`).
 - Mỗi người dùng RAG cục bộ riêng: dữ liệu index nằm ở `storage/` của máy chạy RAG, không chia sẻ.
 
+### D40: nhiều repository trong một hội thoại (đang làm)
+
+**D40 đang làm; API Web chưa đổi.** Mới có phía gọi RAG (`IRagClient.QueryMultiAsync` gọi `POST /v1/query/multi`, hợp đồng v0.3 trong [contracts/](contracts/README.md)) và hai biến cấu hình. Luồng hỏi đáp vẫn dùng `POST /v1/query` trên repository đang active; chưa có bảng Scope, chưa có endpoint mới, frontend không phải làm gì.
+
+| Biến | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `RAG_QUERY_API` | `single` | `single` = `POST /v1/query` (như hiện nay, cũng là đường lùi). `multi` = `POST /v1/query/multi`. Giá trị khác làm API không khởi động. Chưa được luồng hỏi đọc. |
+| `CONVERSATION_SCOPE_MAX` | `5` | Số repository tối đa trong một hội thoại, từ 1 đến 5 (yaml v0.3 giới hạn `scope` tối đa 5 phần tử, nên lớn hơn 5 bị từ chối lúc khởi động). Chưa được dùng. |
+
+`/v1/query/multi` dùng chung `RAG_QUERY_MODE`, `RAG_QUERY_RERANK` và `RAG_QUERY_TIMEOUT_SECONDS` (65s) với `/v1/query`, không tự retry, luôn gửi `debug=false`, và không gửi `focus_repository_ids` khi Focus rỗng.
+
+`RAG_MODE=fake` hỗ trợ `/v1/query/multi` với kịch bản chọn bằng dấu hiệu trong câu hỏi (không phân biệt hoa thường; có nhiều dấu hiệu thì lấy theo thứ tự dưới đây):
+
+| Dấu hiệu trong câu hỏi | Kết quả của fake |
+| --- | --- |
+| `fake:unavailable` | 503 `ALL_INDEXES_UNAVAILABLE`, mọi repository `unavailable/index_not_ready` |
+| `fake:no_evidence` | `completed` + `no_evidence`, không có citation (có Focus thì kèm fallback) |
+| `fake:fallback` | Focus chỉ có 1 chunk nên tìm tiếp các repository khác trong Scope (cần Focus khác rỗng và còn repository ngoài Focus, nếu không thì như mặc định) |
+| `fake:partial` | `partial` + `answered`, một repository đã tìm bị `failed/timeout` (cần ít nhất hai repository được tìm, nếu không thì như mặc định) |
+| không có dấu hiệu | `completed` + `answered`, citation từ repository Focus đầu tiên (hoặc repository đầu của Scope khi Focus rỗng); repository ngoài Focus là `not_searched/focus_evidence_sufficient` |
+
+Fake kiểm tra Scope như RAG thật (rỗng, quá 5, trùng id, Focus ngoài Scope đều ra 422 `INVALID_REQUEST`). Index do fake tạo mà chưa `ready` thì là `unavailable/index_not_ready`; index fake chưa từng thấy (ví dụ tạo trước khi khởi động lại API) được coi là sẵn sàng.
+
+Thử mock Prism với yaml v0.3 (đã pin):
+
+```
+curl -X POST localhost:4010/v1/query/multi -H 'X-API-Key: test-key' -H 'Content-Type: application/json' \
+     -d '{"question":"Trace how an order response is produced and consumed.","scope":[{"repository_id":"web-repository-guid-a","index_id":"idx_backend_a","display_name":"orders-api"},{"repository_id":"web-repository-guid-b","index_id":"idx_client_b","display_name":"orders-client"}],"focus_repository_ids":["web-repository-guid-a"],"top_k":8,"options":{"mode":"hybrid","rerank":false},"debug":false}'
+curl -i -X POST localhost:4010/v1/query/multi -H 'X-API-Key: test-key' -H 'Content-Type: application/json' -H 'Prefer: code=503' \
+     -d '{"question":"q","scope":[{"repository_id":"web-repository-guid-a","index_id":"idx_backend_a","display_name":"orders-api"}]}'
+```
+
 Chạy test (cần Docker vì test dựng PostgreSQL thật bằng Testcontainers):
 
 ```
