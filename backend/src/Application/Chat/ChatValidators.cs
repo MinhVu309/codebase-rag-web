@@ -43,10 +43,25 @@ internal static class ConversationTitleRules
     }
 }
 
-/// <summary>Title is optional when creating (null = default title); when given it follows <see cref="ConversationTitleRules"/>.</summary>
+/// <summary>
+/// Title is optional when creating (null = default title); when given it follows <see cref="ConversationTitleRules"/>.
+/// <c>InitialRepositoryId</c> is required only when <paramref name="scope"/> says so (RAG_QUERY_API=multi); without
+/// settings (plain unit tests) it is optional.
+/// </summary>
 public class CreateConversationRequestValidator : AbstractValidator<CreateConversationRequest>
 {
-    public CreateConversationRequestValidator() => this.AddTitleRules(x => x.Title);
+    public CreateConversationRequestValidator(ConversationScopeSettings? scope = null)
+    {
+        this.AddTitleRules(x => x.Title);
+        if (scope is { InitialRepositoryRequired: true })
+            RuleFor(x => x.InitialRepositoryId).NotNull().WithMessage("'Initial Repository Id' is required.");
+    }
+}
+
+public class AddScopeRepositoryRequestValidator : AbstractValidator<AddScopeRepositoryRequest>
+{
+    public AddScopeRepositoryRequestValidator() =>
+        RuleFor(x => x.RepositoryId).NotNull().WithMessage("'Repository Id' must not be empty.");
 }
 
 /// <summary>Title is required when renaming; it follows <see cref="ConversationTitleRules"/>.</summary>

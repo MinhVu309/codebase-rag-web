@@ -123,6 +123,11 @@ public static class DependencyInjection
             return new RagQueryOptions(o.QueryMode, o.QueryRerank);
         });
 
+        // What the Application layer needs to know about Conversation Scope (it does not see Infrastructure options).
+        services.AddSingleton(sp => new Application.Chat.ConversationScopeSettings(
+            sp.GetRequiredService<IOptions<ConversationScopeOptions>>().Value.Max,
+            InitialRepositoryRequired: sp.GetRequiredService<IOptions<RagOptions>>().Value.QueryApi == RagQueryApi.Multi));
+
         services.AddHttpContextAccessor();
         services.AddHttpClient<HttpRagClient>((sp, client) =>
         {

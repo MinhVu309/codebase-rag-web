@@ -37,6 +37,19 @@ public static partial class GitHubRepoUrl
         return true;
     }
 
+    /// <summary>
+    /// "owner/repo" of a stored repository URL (what the UI and RAG's <c>display_name</c> show). Stored URLs are already
+    /// normalized by <see cref="TryNormalize"/>; anything else is returned trimmed and cut to 300 characters (the
+    /// contract's maximum for display_name) instead of throwing.
+    /// </summary>
+    public static string DisplayName(string? repoUrl)
+    {
+        var s = (repoUrl ?? "").Trim();
+        var m = UrlPattern().Match(s);
+        if (m.Success) return $"{m.Groups["owner"].Value}/{m.Groups["repo"].Value}";
+        return s.Length <= 300 ? s : s[..300];
+    }
+
     public static bool IsValidRef(string? gitRef) =>
         gitRef is not null
         && RefPattern().IsMatch(gitRef)

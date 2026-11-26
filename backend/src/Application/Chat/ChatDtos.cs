@@ -3,7 +3,12 @@ using Domain.Entities;
 
 namespace Application.Chat;
 
-public record CreateConversationRequest(string? Title);
+/// <summary>
+/// <c>InitialRepositoryId</c>: the repository (of this project, ready) the conversation starts with; it becomes the first
+/// member of its Scope. Optional while RAG_QUERY_API=single (then the project's active repository is used if it is
+/// ready, else the Scope starts empty); required while RAG_QUERY_API=multi.
+/// </summary>
+public record CreateConversationRequest(string? Title, Guid? InitialRepositoryId = null);
 
 /// <summary>Rename. <c>Title</c> is required; it is trimmed, then must be 1-<see cref="ChatRules.MaxTitleLength"/> characters with no control characters.</summary>
 public record UpdateConversationRequest(string? Title);

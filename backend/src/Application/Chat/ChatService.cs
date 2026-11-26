@@ -20,6 +20,7 @@ public partial class ChatService(
     IRagClient rag,
     RagQueryOptions queryOptions,
     RepositoryService repositories,
+    ConversationScopeSettings scopeSettings,
     IValidator<CreateConversationRequest> createValidator,
     IValidator<UpdateConversationRequest> renameValidator,
     IValidator<AskRequest> askValidator,
@@ -49,21 +50,70 @@ public partial class ChatService(
             .ToList();
     }
 
+    /// <summary>
+    /// Creates a conversation together with its first Scope member in one save (one transaction). Order: project (404) ->
+    /// <c>initialRepositoryId</c> belongs to it (404, worded like "project not found" so the two cannot be told apart) ->
+    /// body validation (400) -> the repository is ready (409 REPOSITORY_NOT_READY).
+    /// Without <c>initialRepositoryId</c> (allowed while RAG_QUERY_API=single): the project's active repository if it is
+    /// ready, otherwise an empty Scope, as before.
+    /// </summary>
     public async Task<ConversationDto> CreateConversationAsync(Guid userId, Guid projectId, CreateConversationRequest request, CancellationToken ct)
     {
-        await EnsureProjectOwnedAsync(userId, projectId, ct);
-        await createValidator.EnsureValidAsync(request, ct);
+        var activeIndexId = await db.Projects.AsNoTracking()
+            .Where(p => p.Id == projectId && p.UserId == userId)
+            .Select(p => new { p.ActiveIndexId })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException("Project not found.");
 
+        Guid? firstRepositoryId = null;
+        if (request.InitialRepositoryId is { } initialId)
+        {
+            var initial = await db.Repositories.AsNoTracking()
+                .Where(r => r.Id == initialId && r.ProjectId == projectId)
+                .Select(r => new { r.Id, r.Status })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException("Project not found.");
+
+            await createValidator.EnsureValidAsync(request, ct);
+            if (initial.Status != IndexStatus.Ready)
+                throw new ConflictException("Repository chưa sẵn sàng. Chờ trạng thái 'ready' rồi tạo hội thoại.",
+                    ScopeErrorCodes.RepositoryNotReady);
+            firstRepositoryId = initial.Id;
+        }
+        else
+        {
+            await createValidator.EnsureValidAsync(request, ct); // multi mode: InitialRepositoryId is required, so this throws
+            if (activeIndexId.ActiveIndexId is { } active)
+                firstRepositoryId = await db.Repositories.AsNoTracking()
+                    .Where(r => r.ProjectId == projectId && r.IndexId == active && r.Status == IndexStatus.Ready)
+                    .Select(r => (Guid?)r.Id)
+                    .FirstOrDefaultAsync(ct);
+        }
+
+        var now = clock.GetUtcNow();
         var conversation = new Conversation
         {
             Id = Guid.CreateVersion7(),
             ProjectId = projectId,
             UserId = userId,
             Title = request.Title?.Trim() ?? ChatRules.DefaultTitle,
-            CreatedAt = clock.GetUtcNow(),
+            CreatedAt = now,
         };
+        if (firstRepositoryId is { } repositoryId)
+            conversation.Repositories.Add(new ConversationRepository { RepositoryId = repositoryId, AddedAt = now, AddedByUserId = userId });
         db.Conversations.Add(conversation);
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (firstRepositoryId is { } id)
+        {
+            // The repository was deleted between the check and the insert (foreign key): it is simply gone.
+            db.ChangeTracker.Clear();
+            if (!await db.Repositories.AnyAsync(r => r.Id == id, ct)) throw new NotFoundException("Project not found.");
+            throw;
+        }
         return new ConversationDto(conversation.Id, conversation.ProjectId, conversation.Title, conversation.CreatedAt);
     }
 

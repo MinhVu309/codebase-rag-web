@@ -39,6 +39,9 @@ public class OwnershipMatrixTests(ApiFactory factory)
         new("DELETE", "api/conversations/{id:guid}", i => ($"/api/conversations/{i.Conversation}", null)),
         new("GET", "api/conversations/{id:guid}/messages", i => ($"/api/conversations/{i.Conversation}/messages", null)),
         new("POST", "api/conversations/{id:guid}/messages", i => ($"/api/conversations/{i.Conversation}/messages", new { question = "hi" })),
+        new("GET", "api/conversations/{id:guid}/repositories", i => ($"/api/conversations/{i.Conversation}/repositories", null)),
+        new("POST", "api/conversations/{id:guid}/repositories", i => ($"/api/conversations/{i.Conversation}/repositories", new { repositoryId = i.Repository })),
+        new("DELETE", "api/conversations/{id:guid}/repositories/{repositoryId:guid}", i => ($"/api/conversations/{i.Conversation}/repositories/{i.Repository}", null)),
     ];
 
     public static IEnumerable<object[]> Cases() => Matrix.Select((_, i) => new object[] { i });
@@ -123,6 +126,10 @@ public class OwnershipMatrixTests(ApiFactory factory)
         await Capture(s.Client.GetAsync($"/api/conversations/{s.ConversationId}/messages"));
         await Capture(s.Client.PostAsync($"/api/projects/{s.ProjectId}/repositories", new { repoUrl = "https://github.com/octo/second" }));
         await Capture(s.Client.GetAsync("/api/auth/me"));
+        await Capture(s.Client.GetAsync($"/api/conversations/{s.ConversationId}/repositories"));
+        await Capture(s.Client.PostAsync($"/api/conversations/{s.ConversationId}/repositories", new { repositoryId = s.RepositoryId }));
+        await Capture(s.Client.PostAsync($"/api/conversations/{s.ConversationId}/repositories", new { repositoryId = Guid.NewGuid() })); // an error body too
+        await Capture(s.Client.DeleteAsync($"/api/conversations/{s.ConversationId}/repositories/{s.RepositoryId}")); // 409: last member
         rag.QueryError = RecordingRagClient.Error(Application.Rag.RagFailureKind.LlmError, "LLM_ERROR");
         await Capture(s.Client.PostAsync($"/api/conversations/{s.ConversationId}/messages", new { question = "again" })); // an error body too
 
