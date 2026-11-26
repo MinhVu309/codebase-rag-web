@@ -91,6 +91,7 @@ public static class DependencyInjection
                 // Bad values are left at the default here and rejected at startup by RagQueryOptionsValidator.
                 if (!string.IsNullOrWhiteSpace(c["RAG_QUERY_MODE"])) o.QueryMode = c["RAG_QUERY_MODE"]!.Trim().ToLowerInvariant();
                 if (bool.TryParse(c["RAG_QUERY_RERANK"], out var rerank)) o.QueryRerank = rerank;
+                o.QueryApi = c["RAG_QUERY_API"]?.Trim().ToLowerInvariant() == "multi" ? RagQueryApi.Multi : RagQueryApi.Single;
                 o.QueryTimeout = Seconds(c["RAG_QUERY_TIMEOUT_SECONDS"], o.QueryTimeout);
                 o.StatusTimeout = Seconds(c["RAG_STATUS_TIMEOUT_SECONDS"], o.StatusTimeout);
                 o.RequestTimeout = Seconds(c["RAG_REQUEST_TIMEOUT_SECONDS"], o.RequestTimeout);
@@ -103,6 +104,17 @@ public static class DependencyInjection
                 "RAG_API_KEY is required (or set RAG_MODE=fake).")
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<RagOptions>, RagQueryOptionsValidator>();
+
+        services.AddOptions<ConversationScopeOptions>()
+            .Configure<IConfiguration>((o, c) =>
+            {
+                // A bad value is left at the default here and rejected at startup by ConversationScopeOptionsValidator.
+                if (int.TryParse(c["CONVERSATION_SCOPE_MAX"], System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out var max) && max > 0)
+                    o.Max = max;
+            })
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ConversationScopeOptions>, ConversationScopeOptionsValidator>();
 
         // The query knobs ChatService sends to RAG: Application only sees this record, not RagOptions.
         services.AddSingleton(sp =>
